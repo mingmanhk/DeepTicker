@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		998672172EB200E80051D51D /* Screenshot.png in Resources */ = {isa = PBXBuildFile; fileRef = 998672162EB200E80051D51D /* Screenshot.png */; };
 		99B935952EAE9FCA00E09960 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 99B935942EAE9FCA00E09960 /* README.md */; };
-		99B935972EAEA06D00E09960 /* Screenshot.png in Resources */ = {isa = PBXBuildFile; fileRef = 99B935962EAEA06D00E09960 /* Screenshot.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -29,8 +29,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		998672162EB200E80051D51D /* Screenshot.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Screenshot.png; sourceTree = "<group>"; };
 		99B935942EAE9FCA00E09960 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		99B935962EAEA06D00E09960 /* Screenshot.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Screenshot.png; sourceTree = "<group>"; };
 		99CC1B252EAC3BE4002417F4 /* DeepTicker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeepTicker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		99CC1B342EAC3BEC002417F4 /* DeepTickerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DeepTickerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		99CC1B3E2EAC3BEC002417F4 /* DeepTickerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DeepTickerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -83,11 +83,11 @@
 			isa = PBXGroup;
 			children = (
 				99B935942EAE9FCA00E09960 /* README.md */,
-				99B935962EAEA06D00E09960 /* Screenshot.png */,
 				99CC1B272EAC3BE4002417F4 /* DeepTicker */,
 				99CC1B372EAC3BEC002417F4 /* DeepTickerTests */,
 				99CC1B412EAC3BEC002417F4 /* DeepTickerUITests */,
 				99CC1B262EAC3BE4002417F4 /* Products */,
+				998672162EB200E80051D51D /* Screenshot.png */,
 			);
 			sourceTree = "<group>";
 		};
@@ -222,7 +222,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				99B935952EAE9FCA00E09960 /* README.md in Resources */,
-				99B935972EAEA06D00E09960 /* Screenshot.png in Resources */,
+				998672172EB200E80051D51D /* Screenshot.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
