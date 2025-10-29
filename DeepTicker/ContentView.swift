@@ -1,0 +1,84 @@
+//
+//  ContentView.swift
+//  DeepTicker
+//
+//  Created by Victor Lam on 10/24/25.
+//
+
+import SwiftUI
+import SwiftData
+import BackgroundTasks
+
+struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query private var items: [Item]
+    
+    init() {
+        BackgroundTaskManager.shared.register()
+    }
+
+    var body: some View {
+        TabView {
+            NavigationSplitView {
+                List {
+                    ForEach(items) { item in
+                        NavigationLink {
+                            Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
+                        } label: {
+                            Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+                        }
+                    }
+                    .onDelete(perform: deleteItems)
+                }
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) { EditButton() }
+                    ToolbarItem { Button(action: addItem) { Label("Add Item", systemImage: "plus") } }
+                }
+            } detail: {
+                Text("Select an item")
+            }
+            .tabItem {
+                Label("Home", systemImage: "house")
+            }
+
+            AINewsTabView(provider: AINewsProvider())
+                .environmentObject(PortfolioStore.preview) // Replace with your real environment injection where appropriate
+                .tabItem {
+                    Label("AI News", systemImage: "newspaper")
+                }
+
+            StocksTabView(aiNewsProvider: AINewsProvider())
+                .environmentObject(PortfolioStore.preview) // Replace with your real environment injection where appropriate
+                .tabItem {
+                    Label("Stocks", systemImage: "chart.line.uptrend.xyaxis")
+                }
+
+            SettingsView()
+                .environmentObject(SettingsManager.shared)
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape")
+                }
+        }
+        .onAppear { BackgroundTaskManager.shared.scheduleNext() }
+    }
+
+    private func addItem() {
+        withAnimation {
+            let newItem = Item(timestamp: Date())
+            modelContext.insert(newItem)
+        }
+    }
+
+    private func deleteItems(offsets: IndexSet) {
+        withAnimation {
+            for index in offsets {
+                modelContext.delete(items[index])
+            }
+        }
+    }
+}
+
+#Preview {
+    ContentView()
+        .modelContainer(for: Item.self, inMemory: true)
+}

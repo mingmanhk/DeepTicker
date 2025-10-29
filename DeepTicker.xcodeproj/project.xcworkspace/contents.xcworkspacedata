@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "self:">
+   </FileRef>
+   <FileRef
+      location = "group:PortfolioView.swift">
+   </FileRef>
+   <FileRef
+      location = "group:MascotView.swift">
+   </FileRef>
+   <FileRef
+      location = "group:PredictionsView.swift">
+   </FileRef>
+   <FileRef
+      location = "group:SettingsView.swift">
+   </FileRef>
+   <FileRef
+      location = "group:DeepTickerApp.swift">
+   </FileRef>
+   <FileRef
+      location = "group:PortfolioWidget.swift">
+   </FileRef>
+   <FileRef
+      location = "group:DeepTickerTests.swift">
+   </FileRef>
+   <FileRef
+      location = "group:README.md">
+   </FileRef>
+</Workspace>

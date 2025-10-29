@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    Config Template
+    
+    This is a template for the Config.plist file. Copy this file to Config.plist
+    and fill in your actual API keys. The Config.plist file is ignored by Git
+    for security purposes.
+    
+    Instructions:
+    1. Copy this file and rename it to "Config.plist"
+    2. Replace the placeholder values with your actual API keys
+    3. The Config.plist file will be automatically loaded by the app
+    4. Config.plist is in .gitignore and won't be committed to version control
+    
+    Required Keys:
+    - DEEPSEEK_API_KEY: Required for AI-powered predictions
+    - ALPHA_VANTAGE_API_KEY: Required for stock market data
+    
+    Optional Keys:
+    - OPENROUTER_API_KEY: For additional AI model access
+    - OPENAI_API_KEY: For OpenAI-powered insights
+    - QWEN_API_KEY: For Qwen-powered insights
+-->
+<plist version="1.0">
+<dict>
+	<key>DEEPSEEK_API_KEY</key>
+	<string>your-deepseek-api-key-here</string>
+	<key>OPENROUTER_API_KEY</key>
+	<string>your-openrouter-api-key-here</string>
+	<key>OPENAI_API_KEY</key>
+	<string>your-openai-api-key-here</string>
+	<key>QWEN_API_KEY</key>
+	<string>your-qwen-api-key-here</string>
+	<key>ALPHA_VANTAGE_API_KEY</key>
+	<string>your-alpha-vantage-api-key-here</string>
+</dict>
+</plist>
