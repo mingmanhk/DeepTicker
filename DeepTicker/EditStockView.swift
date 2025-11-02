@@ -46,7 +46,7 @@ struct EditStockView: View {
                         HStack {
                             Text("Current Price:")
                             Spacer()
-                            Text("$\(currentPrice, specifier: "%.2f")")
+                            Text(String(format: "$%.2f", currentPrice))
                                 .fontWeight(.medium)
                                 .foregroundColor(.primary)
                         }
@@ -55,7 +55,7 @@ struct EditStockView: View {
                     HStack {
                         Text("Total Value:")
                         Spacer()
-                        Text("$\(stock.totalValue, specifier: "%.2f")")
+                        Text(String(format: "$%.2f", stock.totalValue))
                             .fontWeight(.semibold)
                             .foregroundColor(.green)
                     }
@@ -89,7 +89,7 @@ struct EditStockView: View {
                     if let purchasePriceValue = Double(purchasePrice),
                        let currentPrice = stock.currentPrice,
                        let sharesValue = Double(shares),
-                       purchasePriceValue > 0 {
+                       purchasePriceValue > 0, sharesValue > 0 {
                         let totalInvested = purchasePriceValue * sharesValue
                         let currentValue = currentPrice * sharesValue
                         let gain = currentValue - totalInvested
@@ -99,7 +99,7 @@ struct EditStockView: View {
                             HStack {
                                 Text("Total Invested:")
                                 Spacer()
-                                Text("$\(totalInvested, specifier: "%.2f")")
+                                Text(String(format: "$%.2f", totalInvested))
                                     .fontWeight(.medium)
                             }
                             
@@ -107,10 +107,10 @@ struct EditStockView: View {
                                 Text("Gain/Loss:")
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 2) {
-                                    Text("$\(gain, specifier: "%.2f")")
+                                    Text(String(format: "$%.2f", gain))
                                         .fontWeight(.semibold)
                                         .foregroundColor(gain >= 0 ? .green : .red)
-                                    Text("(\(gainPercent, specifier: "%.1f")%)")
+                                    Text(String(format: "(%.1f%%)", gainPercent))
                                         .font(.caption)
                                         .foregroundColor(gain >= 0 ? .green : .red)
                                 }

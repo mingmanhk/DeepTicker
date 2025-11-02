@@ -198,10 +198,10 @@ class SecureConfigurationManager: ObservableObject {
     }
     
     private func loadPromptTemplates() {
-        analyzeProfitConfidencePrompt = promptDefaults.string(forKey: PromptKey.profitConfidence.rawValue) ?? PromptTemplate.defaultProfitConfidence
-        analyzeRiskPrompt = promptDefaults.string(forKey: PromptKey.risk.rawValue) ?? PromptTemplate.defaultRisk
-        analyzePredictionPrompt = promptDefaults.string(forKey: PromptKey.prediction.rawValue) ?? PromptTemplate.defaultPrediction
-        analyzePortfolioPrompt = promptDefaults.string(forKey: PromptKey.portfolio.rawValue) ?? PromptTemplate.defaultPortfolio
+        analyzeProfitConfidencePrompt = promptDefaults.string(forKey: PromptKey.profitConfidence.rawValue) ?? defaultAISummaryConfidencePrompt.defaultProfitConfidence
+        analyzeRiskPrompt = promptDefaults.string(forKey: PromptKey.risk.rawValue) ?? defaultAISummaryConfidencePrompt.defaultAISummaryRiskPrompt
+        analyzePredictionPrompt = promptDefaults.string(forKey: PromptKey.prediction.rawValue) ?? defaultAISummaryConfidencePrompt.defaultAIStockInsigtPrompt
+        analyzePortfolioPrompt = promptDefaults.string(forKey: PromptKey.portfolio.rawValue) ?? defaultAISummaryConfidencePrompt.defaultAIMarketingBriefingPrompt
     }
     
     private func loadFromSecretsPlist(key: String) -> String? {
@@ -354,16 +354,16 @@ enum PromptType: Identifiable {
 
 // MARK: - Default Prompt Templates
 
-struct PromptTemplate {
+struct defaultAISummaryConfidencePrompt {
     static let defaultProfitConfidence = """
 Analyze the following stock portfolio and provide a concise summary of its overall health, diversification, and risk profile. Offer actionable suggestions for improvement.
 """
     
-    static let defaultRisk = """
+    static let defaultAISummaryRiskPrompt = """
 Analyze the following stock portfolio and provide a concise summary of its overall health, diversification, and risk profile. Offer actionable suggestions for improvement.
 """
     
-    static let defaultPrediction = """
+    static let defaultAIStockInsigtPrompt = """
 Recent Historical Data for Last 10 trading days. Please provide a prediction for tomorrow's movement with the following JSON format. All percentage-based values should be numbers between 0 and 100.
 
 {  
@@ -377,7 +377,7 @@ Recent Historical Data for Last 10 trading days. Please provide a prediction for
 }
 """
     
-    static let defaultPortfolio = """
+    static let defaultAIMarketingBriefingPrompt = """
 You are an expert financial analyst AI. Your task is to provide a detailed daily market briefing and portfolio health assessment. Analyze the provided stock symbols in the context of current market events, including political developments, earnings reports, and institutional trades. Provide a brief health assessment with recommendations for diversification or risk management. Structure your response strictly in the requested JSON format with four keys: `overview`, `keyDrivers`, `highlightsAndActivity`, and `riskFactors`.
 """
 }

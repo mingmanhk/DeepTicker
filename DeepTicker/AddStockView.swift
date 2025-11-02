@@ -480,8 +480,8 @@ struct AddStockView: View {
                 }
                 
                 if !self.purchasePrice.isEmpty {
-                    print("🟡 Using fallback price estimate: \$\(self.purchasePrice) for \(symbol)")
-                    print("🟡 ⚠️ This is an estimate - user should verify the actual price")
+                    print("🟡 Using fallback price estimate: $\(self.purchasePrice) for \(symbol)")
+                    print("🟡 WARNING: This is an estimate - user should verify the actual price")
                 }
             } else {
                 print("🔵 Keeping existing purchase price: \(self.purchasePrice)")

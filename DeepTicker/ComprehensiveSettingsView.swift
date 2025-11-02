@@ -502,10 +502,10 @@ struct ComprehensiveSettingsView: View {
     }
     
     private func resetAllPrompts() {
-        configManager.updatePromptTemplate(PromptTemplate.defaultProfitConfidence, for: .profitConfidence)
-        configManager.updatePromptTemplate(PromptTemplate.defaultRisk, for: .risk)
-        configManager.updatePromptTemplate(PromptTemplate.defaultPrediction, for: .prediction)
-        configManager.updatePromptTemplate(PromptTemplate.defaultPortfolio, for: .portfolio)
+        configManager.updatePromptTemplate(defaultAISummaryConfidencePrompt.defaultProfitConfidence, for: .profitConfidence)
+        configManager.updatePromptTemplate(defaultAISummaryConfidencePrompt.defaultAISummaryRiskPrompt, for: .risk)
+        configManager.updatePromptTemplate(defaultAISummaryConfidencePrompt.defaultAIStockInsigtPrompt, for: .prediction)
+        configManager.updatePromptTemplate(defaultAISummaryConfidencePrompt.defaultAIMarketingBriefingPrompt, for: .portfolio)
     }
     
     private func testAPIConnections() async {
@@ -592,10 +592,10 @@ struct PromptEditorSheet: View {
     
     private func defaultPrompt(for type: PromptType) -> String {
         switch type {
-        case .profitConfidence: return PromptTemplate.defaultProfitConfidence
-        case .risk: return PromptTemplate.defaultRisk
-        case .prediction: return PromptTemplate.defaultPrediction
-        case .portfolio: return PromptTemplate.defaultPortfolio
+        case .profitConfidence: return defaultAISummaryConfidencePrompt.defaultProfitConfidence
+        case .risk: return defaultAISummaryConfidencePrompt.defaultAISummaryRiskPrompt
+        case .prediction: return defaultAISummaryConfidencePrompt.defaultAIStockInsigtPrompt
+        case .portfolio: return defaultAISummaryConfidencePrompt.defaultAIMarketingBriefingPrompt
         }
     }
 }
