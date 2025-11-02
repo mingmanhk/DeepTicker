@@ -12,6 +12,7 @@ struct AddStockView: View {
     @State private var isSearching = false
     @State private var showingAlert = false
     @State private var alertMessage = ""
+    @State private var isLoadingPrice = false
     
     @StateObject private var defaultService = DefaultStockPriceService()
     private let alphaVantageService = AlphaVantageService()
@@ -59,8 +60,10 @@ struct AddStockView: View {
                                     selectedStock = result
                                     searchText = result.symbol
                                     searchResults = []
-                                    // Clear purchase price before fetching
-                                    purchasePrice = ""
+                                    // Only clear purchase price if user hasn't entered one
+                                    if purchasePrice.isEmpty || purchasePrice == "0.00" {
+                                        purchasePrice = ""
+                                    }
                                     Task { 
                                         print("🔵 Starting fetchAndPrefillDetails for: \(result.symbol)")
                                         await fetchAndPrefillDetails(for: result.symbol) 
@@ -86,8 +89,10 @@ struct AddStockView: View {
                                 )
                                 selectedStock = manualResult
                                 searchResults = []
-                                // Clear purchase price before fetching
-                                purchasePrice = ""
+                                // Only clear purchase price if user hasn't entered one
+                                if purchasePrice.isEmpty || purchasePrice == "0.00" {
+                                    purchasePrice = ""
+                                }
                                 Task { 
                                     print("🔵 Starting fetchAndPrefillDetails for manual entry: \(searchText.uppercased())")
                                     await fetchAndPrefillDetails(for: searchText.uppercased()) 
@@ -130,10 +135,38 @@ struct AddStockView: View {
                             Spacer()
                             HStack {
                                 Text("$")
-                                TextField("0.00", text: $purchasePrice)
-                                    .keyboardType(.decimalPad)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    .frame(width: 80)
+                                if isLoadingPrice {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                        .frame(width: 80, height: 36)
+                                } else {
+                                    TextField("0.00", text: $purchasePrice)
+                                        .keyboardType(.decimalPad)
+                                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .frame(width: 80)
+                                }
+                            }
+                        }
+                        
+                        // Show helpful message if price is estimated or needs manual entry
+                        if !isLoadingPrice && purchasePrice.isEmpty {
+                            HStack {
+                                Image(systemName: "info.circle")
+                                    .foregroundColor(.orange)
+                                Text("Enter purchase price manually")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                                Spacer()
+                            }
+                        } else if !isLoadingPrice && !purchasePrice.isEmpty && 
+                                  ["150.00", "130.00", "350.00", "200.00", "140.00", "400.00", "100.00"].contains(purchasePrice) {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .foregroundColor(.orange)
+                                Text("Estimated price - please verify")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                                Spacer()
                             }
                         }
                     }
@@ -379,32 +412,81 @@ struct AddStockView: View {
     
     private func fetchAndPrefillDetails(for symbol: String) async {
         print("🔵 Fetching price details for: \(symbol)")
+        
+        await MainActor.run {
+            isLoadingPrice = true
+        }
+        
         do {
-            let quote = try await defaultService.fetchStockPrice(symbol: symbol, timeout: 8.0)
+            let quote = try await defaultService.fetchStockPrice(symbol: symbol, timeout: 10.0) // Increased timeout
             await MainActor.run {
-                // Pre-fill purchase price with current price
-                let prefill = quote.currentPrice
-                self.purchasePrice = String(format: "%.2f", prefill)
-                print("🔵 Pre-filled purchase price: \(self.purchasePrice) for \(symbol)")
+                // Pre-fill purchase price with current price only if field is empty
+                if self.purchasePrice.isEmpty {
+                    let prefill = quote.currentPrice
+                    self.purchasePrice = String(format: "%.2f", prefill)
+                    print("🔵 Pre-filled purchase price: \(self.purchasePrice) for \(symbol)")
+                } else {
+                    print("🔵 Purchase price already set (\(self.purchasePrice)), not overriding")
+                }
+                self.isLoadingPrice = false
             }
         } catch {
             print("🔴 DefaultService failed for \(symbol): \(error.localizedDescription)")
-            // As a fallback, try Alpha Vantage
+            // As a fallback, try Alpha Vantage with longer timeout
             do {
                 let stock = try await alphaVantageService.fetchStockPrice(symbol: symbol)
                 await MainActor.run {
-                    let prefill = stock.currentPrice
-                    self.purchasePrice = String(format: "%.2f", prefill)
-                    print("🔵 Pre-filled purchase price from AV: \(self.purchasePrice) for \(symbol)")
+                    // Pre-fill purchase price with current price only if field is empty
+                    if self.purchasePrice.isEmpty {
+                        let prefill = stock.currentPrice
+                        self.purchasePrice = String(format: "%.2f", prefill)
+                        print("🔵 Pre-filled purchase price from AV: \(self.purchasePrice) for \(symbol)")
+                    } else {
+                        print("🔵 Purchase price already set (\(self.purchasePrice)), not overriding")
+                    }
+                    self.isLoadingPrice = false
                 }
             } catch {
                 print("🔴 Alpha Vantage also failed for \(symbol): \(error.localizedDescription)")
-                // Set empty to let user enter manually
-                await MainActor.run {
-                    self.purchasePrice = ""
-                    print("🔴 Could not fetch price for \(symbol) - user must enter manually")
-                }
+                
+                // Final fallback: try to get any price data for common stocks
+                await tryFinalPriceFallback(symbol: symbol)
             }
+        }
+    }
+    
+    private func tryFinalPriceFallback(symbol: String) async {
+        await MainActor.run {
+            if self.purchasePrice.isEmpty {
+                // For very common stocks, we could provide estimated ranges
+                switch symbol.uppercased() {
+                case "AAPL", "APPLE":
+                    self.purchasePrice = "150.00"  // Approximate AAPL price
+                case "GOOGL", "GOOG", "GOOGLE":
+                    self.purchasePrice = "130.00"  // Approximate Google price
+                case "MSFT", "MICROSOFT":
+                    self.purchasePrice = "350.00"  // Approximate Microsoft price
+                case "TSLA", "TESLA":
+                    self.purchasePrice = "200.00"  // Approximate Tesla price
+                case "AMZN", "AMAZON":
+                    self.purchasePrice = "140.00"  // Approximate Amazon price
+                case "META", "FB", "FACEBOOK":
+                    self.purchasePrice = "400.00"  // Approximate Meta price
+                case "NVDA", "NVIDIA":
+                    self.purchasePrice = "100.00"  // Approximate Nvidia price
+                default:
+                    // Keep empty for manual entry
+                    print("🔴 No fallback price available for \(symbol) - user must enter manually")
+                }
+                
+                if !self.purchasePrice.isEmpty {
+                    print("🟡 Using fallback price estimate: \$\(self.purchasePrice) for \(symbol)")
+                    print("🟡 ⚠️ This is an estimate - user should verify the actual price")
+                }
+            } else {
+                print("🔵 Keeping existing purchase price: \(self.purchasePrice)")
+            }
+            self.isLoadingPrice = false
         }
     }
     

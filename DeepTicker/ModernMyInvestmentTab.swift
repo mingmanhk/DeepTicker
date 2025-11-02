@@ -8,6 +8,9 @@ struct ModernMyInvestmentTab: View {
     @State private var showingStockDetail: StockItem?
     @State private var editingStock: EditingStock?
     @State private var isRefreshing = false
+    @State private var isAddingStock = false // Prevent duplicate taps
+    @State private var lastPortfolioCount = 0 // Track portfolio changes
+    @State private var refreshTask: Task<Void, Never>? // For debouncing refreshes
     
     struct EditingStock: Identifiable, Equatable {
         static func == (lhs: EditingStock, rhs: EditingStock) -> Bool {
@@ -29,7 +32,7 @@ struct ModernMyInvestmentTab: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    ToolbarAppIconView(showAppName: true) {}
+                    ToolbarAppIconView(showAppName: true)
                 }
                 ToolbarItem(placement: .principal) {
                     headerTitleView
@@ -44,10 +47,26 @@ struct ModernMyInvestmentTab: View {
                     .onAppear {
                         print("🔥 AddStockView appeared in fullScreenCover!")
                     }
+                    .onDisappear {
+                        // Reset the adding state when sheet is dismissed
+                        isAddingStock = false
+                        
+                        // Check if portfolio changed and refresh if needed
+                        // We'll trigger refresh after a short delay to ensure any new stock is fully added
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            handleHoldingsChange()
+                        }
+                    }
             }
             .sheet(item: $editingStock) { editingData in
                 EditStockView(stock: editingData.stock, index: editingData.index)
                     .environmentObject(portfolioManager)
+                    .onDisappear {
+                        // Refresh data after editing
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            handleHoldingsChange()
+                        }
+                    }
             }
             .sheet(item: $showingStockDetail) { stock in
                 let portfolioStock = PortfolioStock(
@@ -61,6 +80,29 @@ struct ModernMyInvestmentTab: View {
             }
             .refreshable {
                 await refreshAllData()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PortfolioDidChange"))) { _ in
+                // Auto-refresh when portfolio changes
+                handleHoldingsChange()
+            }
+            .onAppear {
+                // Set up monitoring for portfolio changes
+                setupPortfolioChangeMonitoring()
+                lastPortfolioCount = portfolioManager.items.count
+            }
+            .onChange(of: portfolioManager.items.count) { oldCount, newCount in
+                // Auto-refresh when portfolio count changes
+                if oldCount != newCount && lastPortfolioCount != newCount {
+                    lastPortfolioCount = newCount
+                    print("📊 Portfolio count changed from \(oldCount) to \(newCount), triggering refresh...")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        handleHoldingsChange()
+                    }
+                }
+            }
+            .onDisappear {
+                // Clean up any pending refresh tasks
+                refreshTask?.cancel()
             }
         }
     }
@@ -109,21 +151,17 @@ struct ModernMyInvestmentTab: View {
             .disabled(isRefreshing || portfolioManager.isRefreshing)
             
             Button("Add") {
-                print("🔥 Add button tapped! showingAddStock will be set to true")
-                showingAddStock = true
-                print("🔥 showingAddStock is now: \(showingAddStock)")
+                handleAddStock()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
-            .onTapGesture {
-                print("🔥 Button tap gesture detected!")
-            }
+            .disabled(isAddingStock || isRefreshing || portfolioManager.isRefreshing)
         }
     }
     
     private var content: some View {
         ScrollView {
-            VStack(spacing: 32) {
+            LazyVStack(spacing: 16) {
                 if !portfolioManager.items.isEmpty {
                     portfolioHeaderSection
                     quickStatsSection
@@ -132,24 +170,34 @@ struct ModernMyInvestmentTab: View {
                     emptyStateSection
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 32)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
         }
     }
     
     private var holdingsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Holdings")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundStyle(.primary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Holdings")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                
+                Spacer()
+                
+                Text("\(portfolioManager.items.count) stocks")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             
-            VStack(spacing: 12) {
+            LazyVStack(spacing: 8) {
                 ForEach(Array(portfolioManager.items.enumerated()), id: \.element.id) { index, stock in
                     stockRow(stock: stock, index: index)
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 portfolioManager.remove(at: index)
+                                // Trigger refresh after deletion
+                                handleHoldingsChange()
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -160,33 +208,31 @@ struct ModernMyInvestmentTab: View {
     }
     
     private var emptyStateSection: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: 24) {
             Spacer()
-                .frame(height: 60)
+                .frame(height: 40)
             
-            VStack(spacing: 24) {
+            VStack(spacing: 20) {
                 Image(systemName: "chart.line.uptrend.xyaxis.circle")
-                    .font(.system(size: 80))
+                    .font(.system(size: 60))
                     .foregroundStyle(.secondary)
                 
-                VStack(spacing: 12) {
+                VStack(spacing: 8) {
                     Text("Start Your Investment Journey")
-                        .font(.title)
+                        .font(.title2)
                         .fontWeight(.bold)
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.center)
                     
-                    Text("Add your first stock to begin tracking your portfolio performance and stay updated with market trends")
-                        .font(.body)
+                    Text("Add stocks to track your portfolio performance and market trends")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 16)
                 }
                 
                 Button(action: {
-                    print("🔥 Empty state add button tapped!")
-                    showingAddStock = true
-                    print("🔥 showingAddStock is now: \(showingAddStock)")
+                    handleAddStock()
                 }) {
                     HStack(spacing: 8) {
                         Image(systemName: "plus.circle.fill")
@@ -195,98 +241,125 @@ struct ModernMyInvestmentTab: View {
                     .font(.headline)
                     .fontWeight(.semibold)
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
                 }
-                .background(Color.accentColor)
-                .cornerRadius(16)
+                .background(isAddingStock ? Color.secondary : Color.accentColor)
+                .cornerRadius(12)
+                .disabled(isAddingStock)
             }
             
             Spacer()
         }
-        .padding(.horizontal, 32)
+        .padding(.horizontal, 24)
     }
     
     private var portfolioHeaderSection: some View {
-        VStack(spacing: 16) {
-            VStack(spacing: 8) {
-                Text("Total Portfolio Value")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.secondary)
-                
-                Text("$\(portfolioManager.totalCurrentValue, specifier: "%.2f")")
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .minimumScaleFactor(0.7)
-                
-                HStack(spacing: 8) {
-                    Image(systemName: portfolioManager.totalDailyChange >= 0 ? "arrow.up.right" : "arrow.down.right")
+        VStack(spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Total Portfolio Value")
                         .font(.caption)
-                        .fontWeight(.semibold)
-                    
-                    Text("$\(portfolioManager.totalDailyChange, specifier: "%.2f")")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                    
-                    Text("(\(portfolioManager.totalDailyChangePercentage, specifier: "%.2f")%)")
-                        .font(.callout)
                         .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("$\(portfolioManager.totalCurrentValue, specifier: "%.2f")")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary)
+                        .minimumScaleFactor(0.8)
                 }
-                .foregroundStyle(portfolioManager.totalDailyChange >= 0 ? .green : .red)
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("Today")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: portfolioManager.totalDailyChange >= 0 ? "arrow.up.right" : "arrow.down.right")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                        
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text("$\(portfolioManager.totalDailyChange, specifier: "%.2f")")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            
+                            Text("(\(portfolioManager.totalDailyChangePercentage, specifier: "%.2f")%)")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                    }
+                    .foregroundStyle(portfolioManager.totalDailyChange >= 0 ? .green : .red)
+                }
             }
-            .padding(.vertical, 24)
-            .padding(.horizontal, 20)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
     
     private var quickStatsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Quick Stats")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundStyle(.primary)
+        HStack(spacing: 12) {
+            quickStatCard(
+                title: "Best",
+                value: bestPerformingStock?.symbol ?? "—",
+                change: bestPerformingStock?.dailyChange ?? 0,
+                color: .green
+            )
             
-            HStack(spacing: 8) {
-                quickStatCard(
-                    title: "Best Performer",
-                    value: bestPerformingStock?.symbol ?? "—",
-                    change: bestPerformingStock?.dailyChange ?? 0
-                )
-                
-                quickStatCard(
-                    title: "Worst Performer", 
-                    value: worstPerformingStock?.symbol ?? "—",
-                    change: worstPerformingStock?.dailyChange ?? 0
-                )
-            }
+            quickStatCard(
+                title: "Worst", 
+                value: worstPerformingStock?.symbol ?? "—",
+                change: worstPerformingStock?.dailyChange ?? 0,
+                color: .red
+            )
+            
+            quickStatCard(
+                title: "Holdings",
+                value: "\(portfolioManager.items.count)",
+                change: nil,
+                color: .blue
+            )
         }
     }
     
-    private func quickStatCard(title: String, value: String, change: Double?) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(.secondary)
-            
-            Text(value)
-                .font(.callout)
-                .fontWeight(.bold)
-                .foregroundStyle(.primary)
-            
-            if let change = change {
-                Text("\(change >= 0 ? "+" : "")\(change, specifier: "%.2f")%")
+    private func quickStatCard(title: String, value: String, change: Double?, color: Color) -> some View {
+        VStack(spacing: 6) {
+            HStack {
+                Circle()
+                    .fill(color)
+                    .frame(width: 8, height: 8)
+                
+                Text(title)
                     .font(.caption2)
                     .fontWeight(.medium)
-                    .foregroundStyle(change >= 0 ? .green : .red)
+                    .foregroundStyle(.secondary)
+                
+                Spacer()
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(value)
+                    .font(.callout)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                if let change = change {
+                    Text("\(change >= 0 ? "+" : "")\(change, specifier: "%.1f")%")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundStyle(change >= 0 ? .green : .red)
+                } else {
+                    Text(" ")
+                        .font(.caption2)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 12)
-        .padding(.horizontal, 12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .padding(12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
     }
     
     private var bestPerformingStock: StockItem? {
@@ -626,8 +699,7 @@ struct ModernMyInvestmentTab: View {
                 }
                 
                 Button(action: {
-                    print("📱 Empty portfolio add stock button tapped!")
-                    showingAddStock = true
+                    handleAddStock()
                 }) {
                     HStack(spacing: 8) {
                         Image(systemName: "plus")
@@ -638,6 +710,7 @@ struct ModernMyInvestmentTab: View {
                     .padding(.vertical, 12)
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(isAddingStock)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 40)
@@ -679,6 +752,19 @@ struct ModernMyInvestmentTab: View {
     
     // MARK: - Helper Functions
     
+    private func handleAddStock() {
+        // Prevent duplicate taps
+        guard !isAddingStock else { return }
+        
+        isAddingStock = true
+        showingAddStock = true
+        
+        // Reset the flag after a short delay to prevent rapid successive taps
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            isAddingStock = false
+        }
+    }
+    
     private func refreshAllData() async {
         isRefreshing = true
         
@@ -686,6 +772,29 @@ struct ModernMyInvestmentTab: View {
         await dataManager.forceRefreshAll()
         
         isRefreshing = false
+    }
+    
+    private func handleHoldingsChange() {
+        // Cancel any existing refresh task to debounce
+        refreshTask?.cancel()
+        
+        // Create a new debounced refresh task
+        refreshTask = Task {
+            // Wait a bit to debounce multiple rapid changes
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            // Check if task was cancelled
+            guard !Task.isCancelled else { return }
+            
+            // Automatically refresh all data when holdings change
+            print("📊 Auto-refreshing all data due to portfolio changes...")
+            await refreshAllData()
+        }
+    }
+    
+    private func setupPortfolioChangeMonitoring() {
+        // This will help us detect changes in portfolio
+        // The actual change detection will be handled in the UI actions
     }
 }
 
