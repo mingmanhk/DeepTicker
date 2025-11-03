@@ -5,12 +5,12 @@ A privacy-focused, AI-powered iOS investment portfolio tracker that helps you mo
 ## 📸 Screenshots
 
 ### My Investment
-![Screenshot - My Investment](Screenshots/Screenshot%20-%20My%20Investment.png)
+![Screenshot - My Investment](Screenshots/Screenshot - My Investment.jpg)
 
 Track holdings, returns, and daily movement.
 
 ### AI Insights
-![Screenshot - AI Insights](Screenshots/Screenshot%20-%20AI%20Insights.png)
+![Screenshot - AI Insights](Screenshots/Screenshot - AI Insights.png)
 
 Provider-selected portfolio summary and stock-level insights.
 
