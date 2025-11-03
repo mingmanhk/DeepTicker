@@ -9,6 +9,17 @@ enum StockInsightSortColumn: CaseIterable {
     case gainPotential
     case confidenceScore
     case upsideChance
+    
+    var displayName: String {
+        switch self {
+        case .symbol: return "Stock"
+        case .aiInsightScore: return "AI Insight"
+        case .profitLikelihood: return "Profit %"
+        case .gainPotential: return "Gain %"
+        case .confidenceScore: return "Confidence"
+        case .upsideChance: return "Upside %"
+        }
+    }
 }
 
 @MainActor
@@ -28,6 +39,7 @@ struct EnhancedAIInsightsTab: View {
     @State private var selectedProvider: AIProvider?
     @State private var providerLoadingStates: [AIProvider: Bool] = [:]
     @State private var providerSummaries: [AIProvider: String] = [:]
+    @State private var providerTodaySummaries: [AIProvider: TodayAISummary] = [:]
     @State private var providerStockInsights: [AIProvider: [String: AIStockInsight]] = [:]
     @State private var providerMarketingBriefings: [AIProvider: DeepSeekManager.MarketingBriefing] = [:]
     
@@ -78,6 +90,7 @@ struct EnhancedAIInsightsTab: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: AppDesignSystem.Spacing.xl) {
                 headerSection
+                disclaimerView
                 todayAISummaryPanel
                 aiStockInsightPanel
                 marketingBriefingPanel
@@ -162,7 +175,9 @@ struct EnhancedAIInsightsTab: View {
             }
             .buttonStyle(.borderedProminent)
         }
-        .padding(.vertical, AppDesignSystem.Spacing.xxl)
+        .padding(AppDesignSystem.Spacing.md)
+        .background(.regularMaterial)
+        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: AppDesignSystem.CornerRadius.md))
         .frame(maxWidth: .infinity)
     }
     
@@ -179,13 +194,22 @@ struct EnhancedAIInsightsTab: View {
                 isLoading: isSummaryLoading || (selectedProvider.map { providerLoadingStates[$0] ?? false } ?? false)
             )
             
-            if let selectedProvider = selectedProvider, let summary = providerSummaries[selectedProvider] {
-                Text(.init(summary))
-                    .font(AppDesignSystem.Typography.callout)
+            if let selectedProvider = selectedProvider, let providerSummary = providerTodaySummaries[selectedProvider] {
+                VStack(alignment: .leading, spacing: AppDesignSystem.Spacing.md) {
+                    todaySummaryContent(summary: providerSummary)
+                    if let text = providerSummaries[selectedProvider] {
+                        Text(.init(text))
+                            .font(AppDesignSystem.Typography.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             } else if let summary = todaySummary {
                 todaySummaryContent(summary: summary)
             } else if isSummaryLoading || (selectedProvider.map { providerLoadingStates[$0] ?? false } ?? false) {
                 LoadingView(message: "Analyzing portfolio...")
+                    .padding(AppDesignSystem.Spacing.md)
+                    .background(.regularMaterial)
+                    .cornerRadius(AppDesignSystem.CornerRadius.md)
             } else {
                 EmptyStateView(
                     icon: "chart.bar.doc.horizontal",
@@ -194,45 +218,42 @@ struct EnhancedAIInsightsTab: View {
                              "Add stocks to your portfolio to generate an AI summary." :
                              "Tap the refresh button to generate today's AI summary."
                 )
+                .padding(AppDesignSystem.Spacing.md)
+                .background(.regularMaterial)
+                .cornerRadius(AppDesignSystem.CornerRadius.md)
             }
         }
     }
     
     private func todaySummaryContent(summary: TodayAISummary) -> some View {
         HStack(spacing: AppDesignSystem.Spacing.xl) {
-            summaryMetric(
+            enhancedSummaryMetric(
                 title: "Confidence Profit Score",
-                value: "\(Int(summary.confidenceProfitScore))%",
+                value: summary.confidenceProfitScore,
                 trend: summary.confidenceTrend,
                 color: confidenceColor(summary.confidenceProfitScore),
                 metricInfo: .profitLikelihood
             )
-            Divider().frame(height: 60)
-            summaryMetric(
+            
+            Divider().frame(height: 80)
+            
+            enhancedSummaryMetric(
                 title: "Market Risk",
-                value: "\(Int(summary.marketRisk))%",
+                value: summary.marketRisk,
                 trend: summary.riskTrend,
                 color: riskColorForPercentage(summary.marketRisk),
                 metricInfo: .risk
             )
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
     
-    private func summaryMetric(title: String, value: String, trend: TrendDirection, color: Color, metricInfo: MetricInfo) -> some View {
-        VStack(alignment: .leading, spacing: AppDesignSystem.Spacing.sm) {
+    private func enhancedSummaryMetric(title: String, value: Double, trend: TrendDirection, color: Color, metricInfo: MetricInfo) -> some View {
+        VStack(spacing: AppDesignSystem.Spacing.sm) {
             HStack(spacing: AppDesignSystem.Spacing.xs) {
                 Text(title)
                     .font(AppDesignSystem.Typography.subheadline)
                     .fontWeight(.medium)
-                Image(systemName: trend.icon)
-                    .font(.caption)
-                    .foregroundStyle(trend.color)
-            }
-            HStack(spacing: AppDesignSystem.Spacing.sm) {
-                Text(value)
-                    .font(AppDesignSystem.Typography.title1)
-                    .foregroundStyle(color)
                 Button {
                     selectedMetricInfo = metricInfo
                 } label: {
@@ -242,42 +263,26 @@ struct EnhancedAIInsightsTab: View {
                 }
                 .buttonStyle(.plain)
             }
+            
+            Gauge(value: value, in: 0...100) {
+                Image(systemName: trend.icon)
+            } currentValueLabel: {
+                Text("\(Int(value))")
+                    .font(.caption)
+            }
+            .gaugeStyle(.accessoryCircularCapacity)
+            .tint(color)
+            .scaleEffect(1.2)
         }
     }
     
     // MARK: - AI Stock Insight Panel
     
-    private var aiStockInsightPanel: some View {
-        ModernPanel {
-            PanelHeader(
-                title: "AI Stock Insights",
-                subtitle: selectedProvider.map { "Powered by \($0.displayName)" },
-                icon: "tablecells",
-                iconColor: selectedProvider?.primaryColor ?? .purple,
-                lastUpdate: stockInsightsLastUpdate,
-                isLoading: isStockInsightsLoading || (selectedProvider.map { providerLoadingStates[$0] ?? false } ?? false)
-            )
-            
-            let insights = selectedProvider.flatMap { providerStockInsights[$0] } ?? stockInsights
-            
-            if !insights.isEmpty {
-                stockInsightsTable(insights: Array(insights.values))
-            } else if isStockInsightsLoading || (selectedProvider.map { providerLoadingStates[$0] ?? false } ?? false) {
-                LoadingView(message: "Analyzing individual stocks...")
-            } else {
-                EmptyStateView(
-                    icon: "tablecells",
-                    title: "Stock Insights Table",
-                    message: portfolioManager.items.isEmpty && dataManager.portfolio.isEmpty ?
-                             "Add stocks to your portfolio for individual AI insights." :
-                             "Tap the refresh button to generate AI insights for each stock."
-                )
-            }
-        }
-    }
-    
-    private func stockInsightsTable(insights: [AIStockInsight]) -> some View {
-        let sortedInsights = insights.sorted { lhs, rhs in
+    private var sortedInsights: [AIStockInsight] {
+        let insightsSource = selectedProvider.flatMap { providerStockInsights[$0]?.values } ?? stockInsights.values
+        let insights = Array(insightsSource)
+        
+        return insights.sorted { lhs, rhs in
             let comparison: Bool
             switch sortColumn {
             case .symbol: comparison = lhs.symbol < rhs.symbol
@@ -289,89 +294,161 @@ struct EnhancedAIInsightsTab: View {
             }
             return sortAscending ? comparison : !comparison
         }
-        
-        return ScrollView(.horizontal, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: AppDesignSystem.Spacing.md) {
-                HStack(spacing: 0) {
-                    sortableHeaderButton("Stock", column: .symbol, width: 60)
-                    sortableHeaderButton("AI Insight", column: .aiInsightScore, width: 80)
-                    sortableHeaderButton("Profit %", column: .profitLikelihood, width: 70)
-                    sortableHeaderButton("Gain %", column: .gainPotential, width: 70)
-                    sortableHeaderButton("Confidence", column: .confidenceScore, width: 80)
-                    sortableHeaderButton("Upside %", column: .upsideChance, width: 70)
-                }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, AppDesignSystem.Spacing.md)
+    }
+    
+    private var aiStockInsightPanel: some View {
+        ModernPanel {
+            VStack(alignment: .leading, spacing: AppDesignSystem.Spacing.lg) {
+                PanelHeader(
+                    title: "AI Stock Insights",
+                    subtitle: selectedProvider.map { "Powered by \($0.displayName)" },
+                    icon: "tablecells",
+                    iconColor: selectedProvider?.primaryColor ?? .purple,
+                    lastUpdate: stockInsightsLastUpdate,
+                    isLoading: isStockInsightsLoading || (selectedProvider.map { providerLoadingStates[$0] ?? false } ?? false)
+                )
                 
-                Divider()
+                let insights = selectedProvider.flatMap { providerStockInsights[$0] } ?? stockInsights
                 
-                ForEach(sortedInsights, id: \.symbol) { insight in
-                    stockInsightRow(insight: insight)
+                if !insights.isEmpty {
+                    VStack(spacing: AppDesignSystem.Spacing.md) {
+                        sortingControlsView
+                        ForEach(sortedInsights, id: \.symbol) { insight in
+                            AIStockInsightCardView(
+                                insight: insight,
+                                signalScoreColor: { score in signalScoreColor(score) },
+                                profitLikelihoodColor: { value in profitLikelihoodColor(value) },
+                                gainPotentialColor: { value in gainPotentialColor(value) },
+                                confidenceColor: { value in confidenceColor(value) },
+                                upsideChanceColor: { value in upsideChanceColor(value) }
+                            )
+                        }
+                    }
+                } else if isStockInsightsLoading || (selectedProvider.map { providerLoadingStates[$0] ?? false } ?? false) {
+                    LoadingView(message: "Analyzing individual stocks...")
+                        .padding(AppDesignSystem.Spacing.md)
+                        .background(.regularMaterial)
+                        .cornerRadius(AppDesignSystem.CornerRadius.md)
+                } else {
+                    EmptyStateView(
+                        icon: "tablecells",
+                        title: "Stock Insights Table",
+                        message: portfolioManager.items.isEmpty && dataManager.portfolio.isEmpty ?
+                                 "Add stocks to your portfolio for individual AI insights." :
+                                 "Tap the refresh button to generate AI insights for each stock."
+                    )
+                    .padding(AppDesignSystem.Spacing.md)
+                    .background(.regularMaterial)
+                    .cornerRadius(AppDesignSystem.CornerRadius.md)
                 }
             }
         }
     }
     
-    private func sortableHeaderButton(_ title: String, column: StockInsightSortColumn, width: CGFloat) -> some View {
-        Button {
-            if sortColumn == column {
-                sortAscending.toggle()
-            } else {
-                sortColumn = column
-                sortAscending = column != .symbol
-            }
-        } label: {
-            HStack(spacing: AppDesignSystem.Spacing.xs) {
-                Text(title)
-                    .font(AppDesignSystem.Typography.caption1)
-                    .fontWeight(.semibold)
-                
-                if sortColumn == column {
-                    Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                        .font(.caption2)
-                        .foregroundStyle(.blue)
-                }
-            }
-            .frame(width: width, alignment: column == .symbol ? .leading : .center)
+    private var disclaimerView: some View {
+        Label {
+            Text("Experimental AI signals. Not investment advice.")
+        } icon: {
+            Image(systemName: "info.circle.fill")
         }
-        .buttonStyle(.plain)
-    }
-
-    private func stockInsightRow(insight: AIStockInsight) -> some View {
-        HStack(spacing: 0) {
-            Text(insight.symbol)
-                .font(.caption.weight(.semibold))
-                .frame(width: 60, alignment: .leading)
-
-            Text("\(Int(insight.aiMarketSignalScore))")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(signalScoreColor(insight.aiMarketSignalScore))
-                .frame(width: 80)
-            
-            Text("\(Int(insight.profitLikelihood))")
-                .font(.caption)
-                .foregroundStyle(profitLikelihoodColor(insight.profitLikelihood))
-                .frame(width: 70)
-            
-            Text(String(format: "%.1f", insight.gainPotential))
-                .font(.caption)
-                .foregroundStyle(gainPotentialColor(insight.gainPotential))
-                .frame(width: 70)
-            
-            Text("\(Int(insight.confidenceScore))")
-                .font(.caption)
-                .foregroundStyle(confidenceColor(insight.confidenceScore))
-                .frame(width: 80)
-            
-            Text("\(Int(insight.upsideChance))")
-                .font(.caption)
-                .foregroundStyle(upsideChanceColor(insight.upsideChance))
-                .frame(width: 70)
-        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
         .padding(.vertical, AppDesignSystem.Spacing.sm)
         .padding(.horizontal, AppDesignSystem.Spacing.md)
-        .background(.ultraThinMaterial)
+        .background(.regularMaterial)
         .cornerRadius(AppDesignSystem.CornerRadius.sm)
+        .glassEffect(.regular, in: .rect(cornerRadius: AppDesignSystem.CornerRadius.sm))
+    }
+    
+    private var sortingControlsView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack {
+                ForEach(StockInsightSortColumn.allCases, id: \.self) { column in
+                    Button {
+                        withAnimation(.spring()) {
+                            if sortColumn == column {
+                                sortAscending.toggle()
+                            } else {
+                                sortColumn = column
+                                sortAscending = column != .symbol
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: AppDesignSystem.Spacing.xs) {
+                            Text(column.displayName)
+                            if sortColumn == column {
+                                Image(systemName: sortAscending ? "arrow.up" : "arrow.down")
+                            }
+                        }
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, AppDesignSystem.Spacing.md)
+                        .padding(.vertical, AppDesignSystem.Spacing.sm)
+                        .background(sortColumn == column ? Color.accentColor.opacity(0.15) : .clear)
+                        .overlay(RoundedRectangle(cornerRadius: AppDesignSystem.CornerRadius.sm).stroke(sortColumn == column ? Color.accentColor.opacity(0.35) : .secondary.opacity(0.15), lineWidth: 1))
+                        .contentShape(Rectangle())
+                        .cornerRadius(AppDesignSystem.CornerRadius.sm)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(sortColumn == column ? .blue : .secondary)
+                }
+            }
+        }
+    }
+    
+    private struct AIStockInsightCardView: View {
+        let insight: AIStockInsight
+        
+        // Accessing outer view's methods requires passing them or making them static.
+        // For simplicity, re-defining them here or passing closures.
+        let signalScoreColor: (Double) -> Color
+        let profitLikelihoodColor: (Double) -> Color
+        let gainPotentialColor: (Double) -> Color
+        let confidenceColor: (Double) -> Color
+        let upsideChanceColor: (Double) -> Color
+        
+        var body: some View {
+            VStack(alignment: .leading, spacing: AppDesignSystem.Spacing.md) {
+                HStack(alignment: .top) {
+                    Text(insight.symbol)
+                        .font(AppDesignSystem.Typography.headline)
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: AppDesignSystem.Spacing.xs) {
+                        Text("AI Insight Score")
+                            .font(AppDesignSystem.Typography.caption1)
+                            .foregroundStyle(.secondary)
+                        Text("\(Int(insight.aiMarketSignalScore))")
+                            .font(AppDesignSystem.Typography.title2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(signalScoreColor(insight.aiMarketSignalScore))
+                    }
+                }
+                
+                Divider()
+                
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: AppDesignSystem.Spacing.lg) {
+                    metricDetailView(title: "Profit Likelihood", value: "\(Int(insight.profitLikelihood))%", color: profitLikelihoodColor(insight.profitLikelihood))
+                    metricDetailView(title: "Gain Potential", value: String(format: "%.1f%%", insight.gainPotential), color: gainPotentialColor(insight.gainPotential))
+                    metricDetailView(title: "Confidence Score", value: "\(Int(insight.confidenceScore))%", color: confidenceColor(insight.confidenceScore))
+                    metricDetailView(title: "Upside Chance", value: "\(Int(insight.upsideChance))%", color: upsideChanceColor(insight.upsideChance))
+                }
+            }
+            .padding(AppDesignSystem.Spacing.md)
+            .glassEffect(.regular, in: .rect(cornerRadius: AppDesignSystem.CornerRadius.md))
+        }
+        
+        private func metricDetailView(title: String, value: String, color: Color) -> some View {
+            VStack(alignment: .leading) {
+                Text(title)
+                    .font(AppDesignSystem.Typography.caption1)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(AppDesignSystem.Typography.subheadline.weight(.semibold))
+                    .foregroundStyle(color)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
     
     // MARK: - Marketing Briefing Panel
@@ -395,6 +472,9 @@ struct EnhancedAIInsightsTab: View {
                     marketingBriefingContent(briefing: briefing)
                 } else if marketingBriefingManager.isLoading || (selectedProvider.map { providerLoadingStates[$0] ?? false } ?? false) {
                     LoadingView(message: "Generating market briefing...")
+                        .padding(AppDesignSystem.Spacing.md)
+                        .background(.regularMaterial)
+                        .cornerRadius(AppDesignSystem.CornerRadius.md)
                 } else if let error = marketingBriefingManager.lastError {
                     ErrorStateView(error: error)
                 } else {
@@ -403,34 +483,42 @@ struct EnhancedAIInsightsTab: View {
                         title: "AI Marketing Briefing",
                         message: marketingBriefingEmptyMessage
                     )
+                    .padding(AppDesignSystem.Spacing.md)
+                    .background(.regularMaterial)
+                    .cornerRadius(AppDesignSystem.CornerRadius.md)
                 }
             }
         }
     }
     
     private func marketingBriefingContent(briefing: DeepSeekManager.MarketingBriefing) -> some View {
-        VStack(alignment: .leading, spacing: AppDesignSystem.Spacing.lg) {
-            briefingSection(title: "Market Overview", content: briefing.overview, icon: "chart.bar")
-            briefingSection(title: "Key Drivers", content: briefing.keyDrivers, icon: "arrow.up.circle")
-            briefingSection(title: "Activity & Highlights", content: briefing.highlightsAndActivity, icon: "star.circle")
-            briefingSection(title: "Risk Factors", content: briefing.riskFactors, icon: "exclamationmark.triangle")
+        VStack(alignment: .leading, spacing: AppDesignSystem.Spacing.sm) {
+            briefingDisclosureGroup(title: "Market Overview", content: briefing.overview, icon: "chart.bar")
+            briefingDisclosureGroup(title: "Key Drivers", content: briefing.keyDrivers, icon: "arrow.up.circle")
+            briefingDisclosureGroup(title: "Activity & Highlights", content: briefing.highlightsAndActivity, icon: "star.circle")
+            briefingDisclosureGroup(title: "Risk Factors", content: briefing.riskFactors, icon: "exclamationmark.triangle")
         }
     }
     
-    private func briefingSection(title: String, content: String, icon: String) -> some View {
-        VStack(alignment: .leading, spacing: AppDesignSystem.Spacing.sm) {
+    private func briefingDisclosureGroup(title: String, content: String, icon: String) -> some View {
+        DisclosureGroup {
+            Text(content)
+                .font(AppDesignSystem.Typography.callout)
+                .foregroundStyle(.secondary)
+                .padding(.top, AppDesignSystem.Spacing.sm)
+        } label: {
             HStack(spacing: AppDesignSystem.Spacing.sm) {
                 Image(systemName: icon)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(.purple)
+                    .frame(width: 20)
                 Text(title)
                     .font(AppDesignSystem.Typography.subheadline)
                     .fontWeight(.medium)
             }
-            Text(content)
-                .font(AppDesignSystem.Typography.callout)
-                .foregroundStyle(.secondary)
+            .contentShape(Rectangle())
         }
+        .tint(.primary)
     }
     
     // MARK: - Refresh & Data Logic
@@ -446,6 +534,8 @@ struct EnhancedAIInsightsTab: View {
                     Image(systemName: "arrow.clockwise").font(.title3)
                 }
             }
+            .background(.regularMaterial)
+            .clipShape(Circle())
             .foregroundStyle(.primary)
             .frame(width: 32, height: 32)
             .glassEffect(.regular.interactive(), in: .circle)
@@ -477,6 +567,7 @@ struct EnhancedAIInsightsTab: View {
         let symbols = getPortfolioSymbols()
         guard !symbols.isEmpty else {
             providerSummaries[provider] = "Add stocks to your portfolio to generate AI insights."
+            providerTodaySummaries[provider] = nil
             providerStockInsights[provider] = [:]
             providerMarketingBriefings[provider] = nil
             return
@@ -497,15 +588,32 @@ struct EnhancedAIInsightsTab: View {
         do {
             let stocks = symbols.map { DeepSeekManager.Stock(symbol: $0, currentPrice: 150, previousClose: 148, quantity: 1) }
             let analysis = try await DeepSeekManager.shared.generatePortfolioAnalysis(for: stocks)
+            
+            let confidencePercent = analysis.confidenceScore * 100
+            let riskPercent: Double
+            switch analysis.riskLevel.lowercased() {
+            case "low": riskPercent = 20
+            case "medium": riskPercent = 50
+            case "high": riskPercent = 80
+            default: riskPercent = 50
+            }
+            let providerSummary = TodayAISummary(
+                confidenceProfitScore: confidencePercent,
+                marketRisk: riskPercent,
+                timestamp: Date()
+            )
+            providerTodaySummaries[provider] = providerSummary
+            
             let summaryText = """
             **AI Analysis (\(provider.displayName))**
-            **Confidence Score:** \(Int(analysis.confidenceScore * 100))%
+            **Confidence Score:** \(Int(confidencePercent))%
             **Risk Level:** \(analysis.riskLevel)
             
             Analysis considers current market conditions, diversification, and risk factors.
             """
             providerSummaries[provider] = summaryText
         } catch {
+            providerTodaySummaries[provider] = nil
             providerSummaries[provider] = "**Analysis Failed:**\n\(error.localizedDescription)"
         }
     }
@@ -582,6 +690,7 @@ struct EnhancedAIInsightsTab: View {
             marketRisk: Double.random(in: 10...70),
             timestamp: Date()
         )
+        providerTodaySummaries = [:]
         summaryLastUpdate = Date()
     }
     
@@ -762,3 +871,4 @@ enum TrendDirection: CaseIterable {
         }
     }
 }
+
