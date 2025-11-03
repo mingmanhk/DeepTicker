@@ -15,8 +15,8 @@ struct ContentView: View {
 
     var body: some View {
         TabView {
-            // My Stocks Tab (Enhanced with live valuation)
-            ModernMyInvestmentTab()
+            // Integrated My Stocks Tab (with AI features built-in)
+            IntegratedMyStocksTab()
                 .environmentObject(portfolioManager)
                 .tabItem {
                     Label("My Stocks", systemImage: "briefcase")
@@ -31,7 +31,6 @@ struct ContentView: View {
 
             // Comprehensive Settings Tab
             ComprehensiveSettingsView()
-                .environmentObject(SecureConfigurationManager.shared)
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")
                 }

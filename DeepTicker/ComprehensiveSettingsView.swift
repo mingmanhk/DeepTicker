@@ -1,10 +1,9 @@
 import SwiftUI
-import SwiftUI
 import UIKit
 
 struct ComprehensiveSettingsView: View {
-    @StateObject private var configManager = SecureConfigurationManager.shared
-    @StateObject private var dataManager = DataManager.shared
+    @ObservedObject private var configManager = SecureConfigurationManager.shared
+    @ObservedObject private var dataManager = DataManager.shared
     @State private var expandedSections: Set<SettingsSection> = [.apiKeys]
     @State private var selectedPrompt: PromptType?
 

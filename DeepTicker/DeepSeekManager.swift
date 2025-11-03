@@ -114,8 +114,8 @@ class DeepSeekManager: ObservableObject {
         }
     }
 
-    func generateMarketingBriefing(for stockSymbols: [String], customPrompt: String) async throws -> MarketingBriefing {
-        let prompt = buildMarketingBriefingPrompt(for: stockSymbols, customPrompt: customPrompt)
+    func generateMarketingBriefing(for stocks: [Stock], customPrompt: String) async throws -> MarketingBriefing {
+        let prompt = buildMarketingBriefingPrompt(for: stocks, customPrompt: customPrompt)
         
         let requestBody = DeepSeekAPIRequest(
             model: "deepseek-chat",
@@ -202,15 +202,44 @@ class DeepSeekManager: ObservableObject {
         """
     }
     
-    private func buildMarketingBriefingPrompt(for stockSymbols: [String], customPrompt: String) -> String {
-        let symbolsList = stockSymbols.joined(separator: ", ")
+    private func buildMarketingBriefingPrompt(for stocks: [Stock], customPrompt: String) -> String {
+        let stockDetails = stocks.map { stock in
+            """
+            - **\(stock.symbol):** 
+              • Quantity: \(String(format: "%.2f", stock.quantity)) shares
+              • Current Price: $\(String(format: "%.2f", stock.currentPrice))
+              • Previous Close: $\(String(format: "%.2f", stock.previousClose))
+              • Total Position Value: $\(String(format: "%.2f", stock.totalValue))
+              • Daily Change: \(String(format: "%.2f%%", ((stock.currentPrice - stock.previousClose) / stock.previousClose) * 100))
+            """
+        }.joined(separator: "\n")
+        
+        let totalPortfolioValue = stocks.reduce(0) { $0 + $1.totalValue }
+        let symbolsList = stocks.map { $0.symbol }.joined(separator: ", ")
         
         return """
-        Portfolio Stock Symbols: \(symbolsList)
+        **Portfolio Analysis Request**
         
+        **Stock Holdings Details:**
+        \(stockDetails)
+        
+        **Portfolio Summary:**
+        • Total Portfolio Value: $\(String(format: "%.2f", totalPortfolioValue))
+        • Stock Symbols: \(symbolsList)
+        • Number of Holdings: \(stocks.count)
+        
+        **Analysis Request:**
         \(customPrompt)
         
-        \( SecureConfigurationManager.shared.getPromptTemplate(for: .portfolio))
+        **Instructions:**
+        Analyze the above portfolio holdings in detail. Consider each stock's current performance, market position, and the overall portfolio composition. Provide insights based on:
+        1. Current market conditions affecting these specific stocks
+        2. Sector analysis and diversification assessment
+        3. Individual stock performance and trends
+        4. Risk factors specific to these holdings
+        5. Market opportunities and threats
+        
+        \(SecureConfigurationManager.shared.getPromptTemplate(for: .portfolio))
         """
     }
 
@@ -247,7 +276,10 @@ class DeepSeekManager: ObservableObject {
                 confidence: predictionData.confidence,
                 predictedChange: predictionData.predicted_change,
                 timestamp: Date(),
-                reasoning: predictionData.reasoning
+                reasoning: predictionData.reasoning,
+                profitLikelihood: predictionData.profit_likelihood,
+                gainPotential: predictionData.gain_potential,
+                upsideChance: predictionData.upside_chance
             )
         } catch {
             throw DeepSeekError.parsingError
@@ -389,12 +421,15 @@ class DeepSeekManager: ObservableObject {
         let predictedChange: Double
         let timestamp: Date
         let reasoning: String
+        let profitLikelihood: Double?
+        let gainPotential: Double?
+        let upsideChance: Double?
 
         enum CodingKeys: String, CodingKey {
-            case stockSymbol, prediction, confidence, predictedChange, timestamp, reasoning
+            case stockSymbol, prediction, confidence, predictedChange, timestamp, reasoning, profitLikelihood, gainPotential, upsideChance
         }
 
-        init(stockSymbol: String, prediction: PredictionDirection, confidence: Double, predictedChange: Double, timestamp: Date, reasoning: String) {
+        init(stockSymbol: String, prediction: PredictionDirection, confidence: Double, predictedChange: Double, timestamp: Date, reasoning: String, profitLikelihood: Double? = nil, gainPotential: Double? = nil, upsideChance: Double? = nil) {
             self.id = UUID()
             self.stockSymbol = stockSymbol
             self.prediction = prediction
@@ -402,6 +437,9 @@ class DeepSeekManager: ObservableObject {
             self.predictedChange = predictedChange
             self.timestamp = timestamp
             self.reasoning = reasoning
+            self.profitLikelihood = profitLikelihood
+            self.gainPotential = gainPotential
+            self.upsideChance = upsideChance
         }
 
         nonisolated init(from decoder: Decoder) throws {
@@ -413,6 +451,9 @@ class DeepSeekManager: ObservableObject {
             self.predictedChange = try container.decode(Double.self, forKey: .predictedChange)
             self.timestamp = try container.decode(Date.self, forKey: .timestamp)
             self.reasoning = try container.decode(String.self, forKey: .reasoning)
+            self.profitLikelihood = try container.decodeIfPresent(Double.self, forKey: .profitLikelihood)
+            self.gainPotential = try container.decodeIfPresent(Double.self, forKey: .gainPotential)
+            self.upsideChance = try container.decodeIfPresent(Double.self, forKey: .upsideChance)
         }
     }
     
@@ -487,7 +528,24 @@ class DeepSeekManager: ObservableObject {
     }
     
     private var marketingBriefingSystemPrompt: String {
-        return SecureConfigurationManager.shared.getPromptTemplate(for: .portfolio)
+        return """
+        You are an expert financial analyst AI. Your task is to provide a detailed daily market briefing and portfolio health assessment.
+        Analyze the provided stock symbols in the context of current market events, including political developments, earnings reports, and institutional trades.
+        Provide a brief health assessment with recommendations for diversification or risk management.
+
+        Always maintain a balanced perspective - avoid overly pessimistic language while being realistic about risks.
+        Structure your response strictly in the requested JSON format with four keys: "overview", "keyDrivers", "highlightsAndActivity", and "riskFactors".
+
+        Keep your analysis professional, informative, and actionable while avoiding extreme negative sentiment.
+        
+        Expected JSON format:
+        {
+          "overview": "Brief market overview and portfolio assessment",
+          "keyDrivers": "Key market drivers affecting the portfolio",
+          "highlightsAndActivity": "Notable highlights and market activity",
+          "riskFactors": "Identified risk factors and mitigation strategies"
+        }
+        """
     }
     
 }
@@ -527,6 +585,9 @@ private struct PredictionData: Codable {
     let confidence: Double
     let predicted_change: Double
     let reasoning: String
+    let profit_likelihood: Double?
+    let gain_potential: Double?
+    let upside_chance: Double?
 }
 
 private struct PortfolioResponseData: Codable {

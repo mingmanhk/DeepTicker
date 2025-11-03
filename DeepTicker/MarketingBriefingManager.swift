@@ -19,15 +19,15 @@ class MarketingBriefingManager: ObservableObject {
         loadFromCache()
     }
     
-    func generateBriefing(for stockSymbols: [String], settingsManager: SettingsManager) async {
-        guard !stockSymbols.isEmpty else { 
-            print("❌ MarketingBriefingManager: No stock symbols provided")
+    func generateBriefing(for stocks: [DeepSeekManager.Stock], settingsManager: SettingsManager) async {
+        guard !stocks.isEmpty else { 
+            print("❌ MarketingBriefingManager: No stocks provided")
             return 
         }
         
-        let customPrompt = AIPromptManager.shared.analyzePortfolioPrompt
+        let customPrompt = settingsManager.analyzeMyInvestmentPrompt
         
-        print("📊 MarketingBriefingManager: Starting briefing generation for \(stockSymbols.count) symbols")
+        print("📊 MarketingBriefingManager: Starting briefing generation for \(stocks.count) stocks")
         print("🔑 API Key valid: \(settingsManager.isDeepSeekKeyValid)")
         print("📝 Custom prompt length: \(customPrompt.count) characters")
         
@@ -36,7 +36,7 @@ class MarketingBriefingManager: ObservableObject {
         
         do {
             let briefing = try await attemptBriefingGeneration(
-                for: stockSymbols, 
+                for: stocks, 
                 customPrompt: customPrompt
             )
             
@@ -61,13 +61,13 @@ class MarketingBriefingManager: ObservableObject {
         isLoading = false
     }
     
-    private func attemptBriefingGeneration(for stockSymbols: [String], customPrompt: String) async throws -> DeepSeekManager.MarketingBriefing {
+    private func attemptBriefingGeneration(for stocks: [DeepSeekManager.Stock], customPrompt: String) async throws -> DeepSeekManager.MarketingBriefing {
         var lastError: Error?
         
         for attempt in 1...retryAttempts {
             do {
                 let briefing = try await deepSeekManager.generateMarketingBriefing(
-                    for: stockSymbols, 
+                    for: stocks, 
                     customPrompt: customPrompt
                 )
                 return briefing

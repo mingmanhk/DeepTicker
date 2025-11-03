@@ -254,23 +254,66 @@ class MultiProviderAIService: ObservableObject {
     // MARK: - Provider-Specific Implementations (Stubs)
     
     private func generateDeepSeekPrediction(symbol: String, apiKey: String, prompt: String) async throws -> EnhancedAIInsight? {
-        // Implementation would call DeepSeek API
-        // For now, return a mock response
-        return EnhancedAIInsight(
+        let deepSeekManager = DeepSeekManager.shared
+        
+        // Create a mock Stock object for DeepSeek API (we need to get the actual stock data)
+        let mockStock = DeepSeekManager.Stock(
             symbol: symbol,
-            marketSignal: AIMarketSignalData(
-                todaysProfitLikelihood: Double.random(in: 0...100),
-                forecastedGainPotential: Double.random(in: 0...100),
-                profitConfidenceScore: Double.random(in: 0...100),
-                projectedUpsideChance: Double.random(in: 0...100)
-            ),
-            technicalIndicators: nil,
-            volumeAnalysis: nil,
-            sentimentAnalysis: nil,
-            riskFactors: ["Market volatility", "Sector rotation risk"],
-            timestamp: Date(),
-            provider: .deepSeek
+            currentPrice: 100.0, // This should be fetched from real data
+            previousClose: 99.0,  // This should be fetched from real data
+            quantity: 1.0
         )
+        
+        do {
+            let stockPrediction = try await deepSeekManager.generateStockPrediction(
+                for: mockStock,
+                historicalData: [] // Empty for now, should be populated with real historical data
+            )
+            
+            // Convert DeepSeek StockPrediction to EnhancedAIInsight using the parsed fields
+            // Use the parsed values if available, otherwise fall back to confidence-based values
+            // Handle potential range issues: confidence might be 0-1 or 0-100
+            let baseConfidence = stockPrediction.confidence <= 1.0 ? stockPrediction.confidence * 100 : stockPrediction.confidence
+            
+            let profitLikelihood = stockPrediction.profitLikelihood ?? baseConfidence
+            let gainPotential = stockPrediction.gainPotential ?? (abs(stockPrediction.predictedChange) * 10)
+            let confidenceScore = baseConfidence
+            let upsideChance = stockPrediction.upsideChance ?? baseConfidence
+            
+            // Clamp all values to 0-100 range to prevent UI issues
+            let clampedProfitLikelihood = max(0.0, min(100.0, profitLikelihood))
+            let clampedGainPotential = max(0.0, min(100.0, gainPotential))
+            let clampedConfidenceScore = max(0.0, min(100.0, confidenceScore))
+            let clampedUpsideChance = max(0.0, min(100.0, upsideChance))
+            
+            let marketSignal = AIMarketSignalData(
+                todaysProfitLikelihood: clampedProfitLikelihood,
+                forecastedGainPotential: clampedGainPotential,
+                profitConfidenceScore: clampedConfidenceScore,
+                projectedUpsideChance: clampedUpsideChance
+            )
+            
+            print("DeepSeek API Response Conversion for \(symbol):")
+            print("  Raw confidence: \(stockPrediction.confidence)")
+            print("  Raw profit_likelihood: \(stockPrediction.profitLikelihood ?? -1)")
+            print("  Raw gain_potential: \(stockPrediction.gainPotential ?? -1)")
+            print("  Raw upside_chance: \(stockPrediction.upsideChance ?? -1)")
+            print("  Final values - Profit: \(clampedProfitLikelihood), Gain: \(clampedGainPotential), Confidence: \(clampedConfidenceScore), Upside: \(clampedUpsideChance)")
+            
+            return EnhancedAIInsight(
+                symbol: symbol,
+                marketSignal: marketSignal,
+                technicalIndicators: nil,
+                volumeAnalysis: nil,
+                sentimentAnalysis: nil,
+                riskFactors: ["Market volatility", "Sector rotation risk"],
+                timestamp: stockPrediction.timestamp,
+                provider: .deepSeek
+            )
+        } catch {
+            print("DeepSeek API error: \(error)")
+            return nil
+        }
     }
     
     private func generateDeepSeekInsights(portfolio: [AIStock], apiKey: String, profitPrompt: String, riskPrompt: String) async throws -> PortfolioInsights {
