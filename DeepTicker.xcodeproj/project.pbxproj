@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5793B7CD2EB92F8A007E8F90 /* Screenshot - Settings.png in Resources */ = {isa = PBXBuildFile; fileRef = 5793B7CC2EB92F8A007E8F90 /* Screenshot - Settings.png */; };
+		5793B7CE2EB92F8A007E8F90 /* Screenshot - My Investment.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 5793B7CB2EB92F8A007E8F90 /* Screenshot - My Investment.jpg */; };
+		5793B7CF2EB92F8A007E8F90 /* Screenshot - AI Insights.png in Resources */ = {isa = PBXBuildFile; fileRef = 5793B7CA2EB92F8A007E8F90 /* Screenshot - AI Insights.png */; };
 		993298022EB5C8EC007D56DE /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 993297842EB5C8EC007D56DE /* README.md */; };
 		998672172EB200E80051D51D /* Screenshot.png in Resources */ = {isa = PBXBuildFile; fileRef = 998672162EB200E80051D51D /* Screenshot.png */; };
 /* End PBXBuildFile section */
@@ -29,6 +32,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		5793B7CA2EB92F8A007E8F90 /* Screenshot - AI Insights.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Screenshot - AI Insights.png"; sourceTree = "<group>"; };
+		5793B7CB2EB92F8A007E8F90 /* Screenshot - My Investment.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "Screenshot - My Investment.jpg"; sourceTree = "<group>"; };
+		5793B7CC2EB92F8A007E8F90 /* Screenshot - Settings.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Screenshot - Settings.png"; sourceTree = "<group>"; };
 		993297842EB5C8EC007D56DE /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		998672162EB200E80051D51D /* Screenshot.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Screenshot.png; sourceTree = "<group>"; };
 		99CC1B252EAC3BE4002417F4 /* DeepTicker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeepTicker.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -88,6 +94,9 @@
 				99CC1B262EAC3BE4002417F4 /* Products */,
 				998672162EB200E80051D51D /* Screenshot.png */,
 				993297842EB5C8EC007D56DE /* README.md */,
+				5793B7CA2EB92F8A007E8F90 /* Screenshot - AI Insights.png */,
+				5793B7CB2EB92F8A007E8F90 /* Screenshot - My Investment.jpg */,
+				5793B7CC2EB92F8A007E8F90 /* Screenshot - Settings.png */,
 			);
 			sourceTree = "<group>";
 		};
@@ -222,6 +231,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				998672172EB200E80051D51D /* Screenshot.png in Resources */,
+				5793B7CD2EB92F8A007E8F90 /* Screenshot - Settings.png in Resources */,
+				5793B7CE2EB92F8A007E8F90 /* Screenshot - My Investment.jpg in Resources */,
+				5793B7CF2EB92F8A007E8F90 /* Screenshot - AI Insights.png in Resources */,
 				993298022EB5C8EC007D56DE /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
