@@ -83,6 +83,18 @@ struct EnhancedAIInsightsTab: View {
                 .refreshable {
                     await refreshAllAIData()
                 }
+                .onAppear {
+                    Task { @MainActor in
+                        // Auto-select DeepSeek by default if available and no provider selected
+                        if selectedProvider == nil, settingsManager.isDeepSeekKeyValid,
+                           let deepSeekProvider = availableProviders.first(where: { $0.displayName.lowercased().contains("deepseek") }) {
+                            selectedProvider = deepSeekProvider
+                            await generateAIInsights(for: deepSeekProvider)
+                        } else {
+                            await refreshAllAIData(force: true)
+                        }
+                    }
+                }
         }
     }
     
@@ -187,7 +199,7 @@ struct EnhancedAIInsightsTab: View {
         ModernPanel {
             PanelHeader(
                 title: "Today AI Summary",
-                subtitle: selectedProvider.map { "Powered by \($0.displayName)" },
+                subtitle: (selectedProvider != nil && providerTodaySummaries[selectedProvider!] != nil) ? "Powered by \(selectedProvider!.displayName)" : nil,
                 icon: selectedProvider?.iconName ?? "brain.head.profile",
                 iconColor: selectedProvider?.primaryColor ?? .blue,
                 lastUpdate: summaryLastUpdate,
@@ -301,7 +313,7 @@ struct EnhancedAIInsightsTab: View {
             VStack(alignment: .leading, spacing: AppDesignSystem.Spacing.lg) {
                 PanelHeader(
                     title: "AI Stock Insights",
-                    subtitle: selectedProvider.map { "Powered by \($0.displayName)" },
+                    subtitle: (selectedProvider != nil && providerStockInsights[selectedProvider!] != nil) ? "Powered by \(selectedProvider!.displayName)" : nil,
                     icon: "tablecells",
                     iconColor: selectedProvider?.primaryColor ?? .purple,
                     lastUpdate: stockInsightsLastUpdate,
@@ -457,7 +469,7 @@ struct EnhancedAIInsightsTab: View {
         ModernPanel {
             CollapsiblePanelHeader(
                 title: "AI Marketing Briefing",
-                subtitle: selectedProvider.map { "Powered by \($0.displayName)" },
+                subtitle: (selectedProvider != nil && providerMarketingBriefings[selectedProvider!] != nil) ? "Powered by \(selectedProvider!.displayName)" : nil,
                 icon: "chart.line.uptrend.xyaxis",
                 iconColor: selectedProvider?.primaryColor ?? .purple,
                 lastUpdate: marketingBriefingManager.currentBriefing?.timestamp,
@@ -550,15 +562,28 @@ struct EnhancedAIInsightsTab: View {
         return aiService.isLoading || isSummaryLoading || isStockInsightsLoading || marketingBriefingManager.isLoading || selectedProviderLoading
     }
     
-    private func refreshAllAIData() async {
+    private func refreshAllAIData(force: Bool = false) async {
+        if force {
+            // Clear cached provider-specific state
+            providerSummaries.removeAll()
+            providerTodaySummaries.removeAll()
+            providerStockInsights.removeAll()
+            providerMarketingBriefings.removeAll()
+            // Clear default caches
+            todaySummary = nil
+            stockInsights.removeAll()
+            marketingBriefingManager.clearCurrentBriefing()
+            // Reset timestamps
+            summaryLastUpdate = nil
+            stockInsightsLastUpdate = nil
+        }
+        
+        // If no provider is selected, do not generate default data; leave panels empty
+        guard selectedProvider != nil else { return }
+        
         await withTaskGroup(of: Void.self) { group in
             if let provider = selectedProvider {
                 group.addTask { await generateAIInsights(for: provider) }
-            } else {
-                group.addTask { await refreshInsights() }
-                group.addTask { await refreshTodaySummary() }
-                group.addTask { await refreshStockInsights() }
-                group.addTask { await refreshMarketingBriefing() }
             }
         }
     }
@@ -605,7 +630,7 @@ struct EnhancedAIInsightsTab: View {
             providerTodaySummaries[provider] = providerSummary
             
             let summaryText = """
-            **AI Analysis (\(provider.displayName))**
+            **AI Analysis**
             **Confidence Score:** \(Int(confidencePercent))%
             **Risk Level:** \(analysis.riskLevel)
             
@@ -871,4 +896,3 @@ enum TrendDirection: CaseIterable {
         }
     }
 }
-
