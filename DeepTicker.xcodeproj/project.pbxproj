@@ -35,6 +35,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		5793B7DD2EB94290007E8F90 /* Screenshots */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Screenshots;
+			sourceTree = "<group>";
+		};
 		99CC1B272EAC3BE4002417F4 /* DeepTicker */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = DeepTicker;
@@ -80,6 +85,7 @@
 		99CC1B1C2EAC3BE4002417F4 = {
 			isa = PBXGroup;
 			children = (
+				5793B7DD2EB94290007E8F90 /* Screenshots */,
 				99CC1B272EAC3BE4002417F4 /* DeepTicker */,
 				99CC1B372EAC3BEC002417F4 /* DeepTickerTests */,
 				99CC1B412EAC3BEC002417F4 /* DeepTickerUITests */,
@@ -114,6 +120,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				5793B7DD2EB94290007E8F90 /* Screenshots */,
 				99CC1B272EAC3BE4002417F4 /* DeepTicker */,
 			);
 			name = DeepTicker;
