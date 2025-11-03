@@ -24,6 +24,7 @@ class SettingsManager: ObservableObject {
     }
     
     private static let keychainService = "com.example.DeepTicker.apiKeys"
+    static let defaultAIMarketingBriefingPrompt: String = "You are an expert financial analyst AI. Your task is to provide a detailed daily market briefing and portfolio health assessment. Analyze the provided stock symbols in the context of current market events, including political developments, earnings reports, and institutional trades. Provide a brief health assessment with recommendations for diversification or risk management. Structure your response strictly in the requested JSON format with four keys: \"overview\", \"keyDrivers\", \"highlightsAndActivity\", and \"riskFactors\"."
 
     // API Keys
     @Published var alphaVantageAPIKey: String {
@@ -204,16 +205,16 @@ class SettingsManager: ObservableObject {
         self.analyzeSystemPrompt = UserDefaults.standard.string(forKey: "analyzeSystemPrompt") ?? 
             "You are a financial analyst AI specialized in short-term stock predictions.\nAnalyze stock data and provide concise predictions with confidence levels.\nAlways respond with valid JSON format and keep explanations brief but insightful.\nFocus on technical indicators, volume trends, and recent market behavior."
         
-        self.analyzePredictionRiskPrompt = UserDefaults.standard.string(forKey: "analyzePredictionRiskPrompt") ?? 
+        self.analyzePredictionRiskPrompt = UserDefaults.standard.string(forKey: "analyzePredictionRiskPrompt") ??
             "Analyze the following stock portfolio and provide a concise summary of its overall health, diversification, and risk profile. Offer actionable suggestions for improvement."
         
-        self.analyzePredictionConfidencePrompt = UserDefaults.standard.string(forKey: "analyzePredictionConfidencePrompt") ?? 
+        self.analyzePredictionConfidencePrompt = UserDefaults.standard.string(forKey: "analyzePredictionConfidencePrompt") ??
             "Recent Historical Data for Last 10 trading days. Please provide a prediction for tomorrow's movement with the following JSON format. All percentage-based values should be numbers between 0 and 100."
         
-        self.analyzePredictionPrompt = UserDefaults.standard.string(forKey: "analyzePredictionPrompt") ?? 
+        self.analyzePredictionPrompt = UserDefaults.standard.string(forKey: "analyzePredictionPrompt") ??
             "Recent Historical Data for Last 10 trading days Please provide a prediction for tomorrow's movement with the following JSON format. All percentage-based values should be numbers between 0 and 100. { \"direction\": \"up|down|neutral\", \"confidence\": 85.0, \"predicted_change\": 2.5, \"reasoning\": \"Brief explanation of analysis.\", \"profit_likelihood\": 75.0, \"gain_potential\": 4.5, \"upside_chance\": 80.0 }"
         
-        self.analyzeMyInvestmentPrompt = UserDefaults.standard.string(forKey: "analyzeMyInvestmentPrompt") ?? 
+        self.analyzeMyInvestmentPrompt = UserDefaults.standard.string(forKey: "analyzeMyInvestmentPrompt") ??
             "You are an expert financial analyst AI. Your task is to provide a detailed daily market briefing and portfolio health assessment. Analyze the provided stock symbols in the context of current market events, including political developments, earnings reports, and institutional trades. Provide a brief health assessment with recommendations for diversification or risk management. Structure your response strictly in the requested JSON format with four keys: \"overview\", \"keyDrivers\", \"highlightsAndActivity\", and \"riskFactors\"."
     }
 
@@ -341,5 +342,4 @@ enum AlertFrequency: String, CaseIterable {
         }
     }
 }
-
 

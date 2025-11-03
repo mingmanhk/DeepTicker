@@ -25,9 +25,11 @@ class MarketingBriefingManager: ObservableObject {
             return 
         }
         
+        let customPrompt = AIPromptManager.shared.analyzePortfolioPrompt
+        
         print("📊 MarketingBriefingManager: Starting briefing generation for \(stockSymbols.count) symbols")
         print("🔑 API Key valid: \(settingsManager.isDeepSeekKeyValid)")
-        print("📝 Custom prompt length: \(settingsManager.analyzeMyInvestmentPrompt.count) characters")
+        print("📝 Custom prompt length: \(customPrompt.count) characters")
         
         isLoading = true
         lastError = nil
@@ -35,7 +37,7 @@ class MarketingBriefingManager: ObservableObject {
         do {
             let briefing = try await attemptBriefingGeneration(
                 for: stockSymbols, 
-                customPrompt: settingsManager.analyzeMyInvestmentPrompt
+                customPrompt: customPrompt
             )
             
             print("✅ MarketingBriefingManager: Briefing generated successfully")

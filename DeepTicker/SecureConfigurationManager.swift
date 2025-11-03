@@ -198,10 +198,10 @@ class SecureConfigurationManager: ObservableObject {
     }
     
     private func loadPromptTemplates() {
-        analyzeProfitConfidencePrompt = promptDefaults.string(forKey: PromptKey.profitConfidence.rawValue) ?? defaultAISummaryConfidencePrompt.defaultProfitConfidence
-        analyzeRiskPrompt = promptDefaults.string(forKey: PromptKey.risk.rawValue) ?? defaultAISummaryConfidencePrompt.defaultAISummaryRiskPrompt
-        analyzePredictionPrompt = promptDefaults.string(forKey: PromptKey.prediction.rawValue) ?? defaultAISummaryConfidencePrompt.defaultAIStockInsigtPrompt
-        analyzePortfolioPrompt = promptDefaults.string(forKey: PromptKey.portfolio.rawValue) ?? defaultAISummaryConfidencePrompt.defaultAIMarketingBriefingPrompt
+        analyzeProfitConfidencePrompt = promptDefaults.string(forKey: PromptKey.profitConfidence.rawValue) ?? DefaultPromptTemplates.profitConfidence
+        analyzeRiskPrompt = promptDefaults.string(forKey: PromptKey.risk.rawValue) ?? DefaultPromptTemplates.summaryRisk
+        analyzePredictionPrompt = promptDefaults.string(forKey: PromptKey.prediction.rawValue) ?? DefaultPromptTemplates.stockInsight
+        analyzePortfolioPrompt = promptDefaults.string(forKey: PromptKey.portfolio.rawValue) ?? DefaultPromptTemplates.marketBriefing
     }
     
     private func loadFromSecretsPlist(key: String) -> String? {
@@ -354,30 +354,49 @@ enum PromptType: Identifiable {
 
 // MARK: - Default Prompt Templates
 
-struct defaultAISummaryConfidencePrompt {
-    static let defaultProfitConfidence = """
-Analyze the following stock portfolio and provide a concise summary of its overall health, diversification, and risk profile. Offer actionable suggestions for improvement.
-"""
-    
-    static let defaultAISummaryRiskPrompt = """
-Analyze the following stock portfolio and provide a concise summary of its overall health, diversification, and risk profile. Offer actionable suggestions for improvement.
-"""
-    
-    static let defaultAIStockInsigtPrompt = """
-Recent Historical Data for Last 10 trading days. Please provide a prediction for tomorrow's movement with the following JSON format. All percentage-based values should be numbers between 0 and 100.
+struct DefaultPromptTemplates {
+    static let profitConfidence = """
+Provide an overall portfolio analysis focusing on:
+        1. General market sentiment affecting the entire portfolio
+        2. Overall risk assessment across all holdings
+        3. Confidence score for the portfolio's performance potential
+        4. Brief summary of key factors impacting the portfolio as a whole
 
-{  
-  "direction": "up|down|neutral",  
-  "confidence": 85.0,  
-  "predicted_change": 2.5,  
-  "reasoning": "Brief explanation of analysis.",  
-  "profit_likelihood": 75.0,  
-  "gain_potential": 4.5,  
-  "upside_chance": 80.0  
+Respond in the following JSON format:
+
+{
+  "insights": {
+    "confidence_score": 0.75,
+    "risk_level": "Medium"
+  }
+}
+"""
+
+    static let summaryRisk = """
+Analyze the following stock portfolio and provide a concise summary of its overall health, diversification, and risk profile. Offer actionable suggestions for improvement.
+"""
+    
+    static let stockInsight = """
+Please provide a prediction for tomorrow's movement with the following JSON format. All percentage-based values should be numbers between 0 and 100.
+{
+  "direction": "up|down|neutral",
+  "confidence": 0.85,
+  "predicted_change": 2.5,
+  "reasoning": "Brief explanation of analysis.",
+  "profit_likelihood": 75.0,
+  "gain_potential": 4.5,
+  "upside_chance": 80.0
 }
 """
     
-    static let defaultAIMarketingBriefingPrompt = """
-You are an expert financial analyst AI. Your task is to provide a detailed daily market briefing and portfolio health assessment. Analyze the provided stock symbols in the context of current market events, including political developments, earnings reports, and institutional trades. Provide a brief health assessment with recommendations for diversification or risk management. Structure your response strictly in the requested JSON format with four keys: `overview`, `keyDrivers`, `highlightsAndActivity`, and `riskFactors`.
+    static let marketBriefing = """
+You are an expert financial analyst AI. Your task is to provide a detailed daily market briefing and portfolio health assessment.
+Analyze the provided stock symbols in the context of current market events, including political developments, earnings reports, and institutional trades.
+Provide a brief health assessment with recommendations for diversification or risk management.
+
+Always maintain a balanced perspective - avoid overly pessimistic language while being realistic about risks.
+Structure your response strictly in the requested JSON format with four keys: "overview", "keyDrivers", "highlightsAndActivity", and "riskFactors".
+
+Keep your analysis professional, informative, and actionable while avoiding extreme negative sentiment.
 """
 }

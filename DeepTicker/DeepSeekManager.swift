@@ -10,10 +10,9 @@ class DeepSeekManager: ObservableObject {
     private let session = URLSession.shared
 
     private var apiKey: String {
-        // Get API key from SettingsManager first
-        let settingsKey = SettingsManager.shared.deepSeekAPIKey
-        if !settingsKey.isEmpty && !settingsKey.hasPrefix("REPLACE_") && !settingsKey.hasPrefix("your_") {
-            return settingsKey
+        // Get API key from SecureConfigurationManager (System tab API key)
+        if let systemKey = SecureConfigurationManager.shared.getAPIKey(for: .deepSeek) {
+            return systemKey
         }
         
         // Fallback to environment variable
@@ -21,8 +20,8 @@ class DeepSeekManager: ObservableObject {
             return envKey
         }
         
-        // Last resort: use the provided key (should be updated in settings)
-        return "sk-79819a28af4c4d3f8d79253b7a96bf22"
+        // Last resort: return empty string (will trigger hasValidAPIKey to return false)
+        return ""
     }
     
     private var hasValidAPIKey: Bool { 
@@ -38,7 +37,7 @@ class DeepSeekManager: ObservableObject {
         historicalData: [HistoricalDataPoint]
     ) async throws -> StockPrediction {
 
-        let prompt = buildPredictionPrompt(for: stock, with: historicalData)
+        let prompt = AIInsightSystemPrompt(for: stock, with: historicalData)
 
         let requestBody = DeepSeekAPIRequest(
             model: "deepseek-chat",
@@ -77,12 +76,12 @@ class DeepSeekManager: ObservableObject {
     }
 
     func generatePortfolioAnalysis(for stocks: [Stock]) async throws -> PortfolioAnalysis {
-        let prompt = buildPortfolioPrompt(for: stocks)
+        let prompt = SummaryConfidencePrompt(for: stocks)
 
         let requestBody = DeepSeekAPIRequest(
             model: "deepseek-chat",
             messages: [
-                DeepSeekAPIMessage(role: "system", content: portfolioAnalysisSystemPrompt),
+                DeepSeekAPIMessage(role: "system", content: SummaryRiskSystemPrompt),
                 DeepSeekAPIMessage(role: "user", content: prompt)
             ],
             temperature: 0.4,
@@ -162,7 +161,7 @@ class DeepSeekManager: ObservableObject {
     }
 
     // MARK: - Private Methods
-    private func buildPredictionPrompt(for stock: Stock, with historicalData: [HistoricalDataPoint]) -> String {
+    private func AIInsightSystemPrompt(for stock: Stock, with historicalData: [HistoricalDataPoint]) -> String {
         let recentData = Array(historicalData.suffix(10)) // Last 10 days
         let dataString = recentData.map { point in
             "Date: \(DateFormatter.shortDate.string(from: point.date)), Close: $\(point.close), Volume: \(point.volume)"
@@ -179,44 +178,27 @@ class DeepSeekManager: ObservableObject {
         Recent Historical Data (Last 10 trading days):
         \(dataString)
 
-        Please provide a prediction for tomorrow's movement with the following JSON format:
-        {
-            "direction": "up|down|neutral",
-            "confidence": 0.85,
-            "predicted_change": 2.5,
-            "reasoning": "Brief explanation of analysis"
-        }
+        \(SecureConfigurationManager.shared.getPromptTemplate(for: .prediction))
         """
     }
 
-    private func buildPortfolioPrompt(for stocks: [Stock]) -> String {
+    private func SummaryConfidencePrompt(for stocks: [Stock]) -> String {
         let stockDetails = stocks.map { stock in
-            "- **\(stock.symbol):** \(String(format: "%.2f", stock.quantity)) shares, Current Price: $\(String(format: "%.2f", stock.currentPrice))"
+            "- **\(stock.symbol):** \(String(format: "%.2f", stock.quantity)) shares, Current Price: $\(String(format: "%.2f", stock.currentPrice)), Total Value: $\(String(format: "%.2f", stock.totalValue))"
         }.joined(separator: "\n")
+        
+        let totalPortfolioValue = stocks.reduce(0) { $0 + $1.totalValue }
 
         return """
-        Provide a concise daily briefing for the following portfolio.
+        Analyze the following investment portfolio and provide an overall summary and confidence assessment.
 
         **Portfolio Holdings:**
         \(stockDetails)
+        
+        **Total Portfolio Value:** $\(String(format: "%.2f", totalPortfolioValue))
 
         **Instructions:**
-        1. Provide an overall "AI-Driven Stock Risk & Return Insights" section, formatted as a JSON object.
-        2. For each stock, provide a 1-2 sentence summary of critical news or factors impacting it today.
-
-        Use the following format for your response:
-
-        ```json
-        {
-          "insights": {
-            "confidence_score": 0.75,
-            "risk_level": "Medium"
-          },
-          "stock_updates": {
-            "AAPL": "AI-generated insights",
-            "MSFT": "AI-generated insights"
-          }
-        }
+        \( SecureConfigurationManager.shared.getPromptTemplate(for: .profitConfidence))
         """
     }
     
@@ -228,13 +210,7 @@ class DeepSeekManager: ObservableObject {
         
         \(customPrompt)
         
-        Please provide your analysis in the following JSON format:
-        {
-            "overview": "Overall market outlook and portfolio assessment",
-            "keyDrivers": "Main market drivers and factors affecting these stocks",
-            "highlightsAndActivity": "Notable events, earnings, or institutional activity",
-            "riskFactors": "Key risks and considerations for the portfolio"
-        }
+        \( SecureConfigurationManager.shared.getPromptTemplate(for: .portfolio))
         """
     }
 
@@ -482,7 +458,7 @@ class DeepSeekManager: ObservableObject {
         """
     }
 
-    private var portfolioAnalysisSystemPrompt: String {
+    private var SummaryRiskSystemPrompt: String {
         return """
         You are a financial analyst AI. Your task is to provide a concise daily briefing for a stock portfolio.
 
@@ -511,17 +487,9 @@ class DeepSeekManager: ObservableObject {
     }
     
     private var marketingBriefingSystemPrompt: String {
-        return """
-        You are an expert financial analyst AI. Your task is to provide a detailed daily market briefing and portfolio health assessment. 
-        Analyze the provided stock symbols in the context of current market events, including political developments, earnings reports, and institutional trades. 
-        Provide a brief health assessment with recommendations for diversification or risk management. 
-        
-        Always maintain a balanced perspective - avoid overly pessimistic language while being realistic about risks.
-        Structure your response strictly in the requested JSON format with four keys: "overview", "keyDrivers", "highlightsAndActivity", and "riskFactors".
-        
-        Keep your analysis professional, informative, and actionable while avoiding extreme negative sentiment.
-        """
+        return SecureConfigurationManager.shared.getPromptTemplate(for: .portfolio)
     }
+    
 }
 
 // MARK: - Extensions
@@ -563,7 +531,6 @@ private struct PredictionData: Codable {
 
 private struct PortfolioResponseData: Codable {
     let insights: Insights
-    let stock_updates: [String: String]
 }
 
 private struct MarketingBriefingResponseData: Codable {
