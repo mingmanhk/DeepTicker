@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		993298022EB5C8EC007D56DE /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 993297842EB5C8EC007D56DE /* README.md */; };
-		998672172EB200E80051D51D /* Screenshot.png in Resources */ = {isa = PBXBuildFile; fileRef = 998672162EB200E80051D51D /* Screenshot.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -30,7 +29,6 @@
 
 /* Begin PBXFileReference section */
 		993297842EB5C8EC007D56DE /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		998672162EB200E80051D51D /* Screenshot.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Screenshot.png; sourceTree = "<group>"; };
 		99CC1B252EAC3BE4002417F4 /* DeepTicker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeepTicker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		99CC1B342EAC3BEC002417F4 /* DeepTickerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DeepTickerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		99CC1B3E2EAC3BEC002417F4 /* DeepTickerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DeepTickerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -86,7 +84,6 @@
 				99CC1B372EAC3BEC002417F4 /* DeepTickerTests */,
 				99CC1B412EAC3BEC002417F4 /* DeepTickerUITests */,
 				99CC1B262EAC3BE4002417F4 /* Products */,
-				998672162EB200E80051D51D /* Screenshot.png */,
 				993297842EB5C8EC007D56DE /* README.md */,
 			);
 			sourceTree = "<group>";
@@ -221,7 +218,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				998672172EB200E80051D51D /* Screenshot.png in Resources */,
 				993298022EB5C8EC007D56DE /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

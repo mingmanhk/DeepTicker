@@ -5,17 +5,17 @@ A privacy-focused, AI-powered iOS investment portfolio tracker that helps you mo
 ## 📸 Screenshots
 
 ### My Investment
-![Screenshot - My Investment](Screenshots/Screenshot - My Investment.jpg)
+![Screenshot - My Investment](Screenshots/Screenshot%20-%20My%20Investment.png)
 
 Track holdings, returns, and daily movement.
 
 ### AI Insights
-![Screenshot - AI Insights](Screenshots/Screenshot - AI Insights.jpg)
+![Screenshot - AI Insights](Screenshots/Screenshot%20-%20AI%20Insights.png)
 
 Provider-selected portfolio summary and stock-level insights.
 
 ### Settings
-![Screenshot - Settings](Screenshots/Screenshot - Settings.jpg)
+![Screenshot - Settings](Screenshots/Screenshot%20-%20Settings.png)
 
 Configure API keys, prompts, and data sources.
 
@@ -108,25 +108,5 @@ Default selection: If a valid DeepSeek key is present, DeepSeek is auto-selected
 - **No Server Uploads**: Portfolio data and positions are never transmitted to our servers. Only essential requests are sent to third-party APIs for market data and AI analysis.
 - **No Tracking**: Zero collection of personal data
 - **Full Control**: Complete ownership of your financial information
-
-## 🚀 Getting Started
-
-### Prerequisites
-- iOS 16.0 or later
-- Xcode 15.0 or later (for development)
-- Swift 5.9 or later
-
-### API Keys Setup
-DeepTicker requires API keys from third-party services. You can configure these in the app settings or via configuration files:
-
-#### Required Keys
-- **Alpha Vantage**: Stock market data ([Get Your Key](https://www.alphavantage.co/support/#api-key))
-- **DeepSeek**: Primary AI analysis provider ([Get Your Key](https://platform.deepseek.com/api_keys))
-
-#### Optional Keys
-- **OpenAI**: Alternative AI provider ([Get Your Key](https://platform.openai.com/api-keys))
-- **Qwen**: Alibaba's AI model ([Get Your Key](https://modelstudio.console.alibabacloud.com/#/api-key))
-- **OpenRouter**: Multi-model AI access ([Get Your Key](https://openrouter.ai/settings/keys))
-- **RapidAPI**: Additional market data ([Get Your Key](https://rapidapi.com/hub))
 
 *Last Updated: November 3, 2025*
