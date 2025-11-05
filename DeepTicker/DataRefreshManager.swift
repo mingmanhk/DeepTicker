@@ -1,11 +1,8 @@
 import Foundation
 import Combine
-import SwiftUI
 
 @MainActor
-final class DataRefreshManager: ObservableObject {
-    var objectWillChange: ObservableObjectPublisher
-    
+class DataRefreshManager: ObservableObject {
     @Published var preloadingEnabled: Bool = true
 
     func scheduleBackgroundRefresh() {
@@ -19,7 +16,5 @@ final class DataRefreshManager: ObservableObject {
     
     static let shared = DataRefreshManager()
     
-    private init() {
-        self.objectWillChange = ObservableObjectPublisher()
-    }
+    private init() {}
 }

@@ -451,6 +451,38 @@ struct ComprehensiveSettingsView: View {
         }
         .foregroundStyle(.blue)
         
+        // TODO: Implement IAPDebugView
+//        #if DEBUG
+//        // IAP Debug Tool
+//        NavigationLink {
+//            IAPDebugView()
+//        } label: {
+//            HStack {
+//                Image(systemName: "cart.badge.questionmark")
+//                    .foregroundStyle(.purple)
+//                    .frame(width: 20)
+//                
+//                VStack(alignment: .leading, spacing: 2) {
+//                    Text("IAP Debug Tool")
+//                        .font(.subheadline)
+//                        .fontWeight(.medium)
+//                        .foregroundStyle(.primary)
+//                    
+//                    Text("Troubleshoot In-App Purchases")
+//                        .font(.caption)
+//                        .foregroundStyle(.secondary)
+//                }
+//                
+//                Spacer()
+//                
+//                Image(systemName: "chevron.right")
+//                    .font(.caption2)
+//                    .foregroundStyle(.secondary)
+//            }
+//            .padding(.vertical, 4)
+//        }
+//        #endif
+        
         // App Info
         HStack {
             Text("App Version")

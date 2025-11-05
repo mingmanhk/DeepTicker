@@ -46,8 +46,9 @@ struct RootTabView: View {
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
         switch newPhase {
         case .active:
-            // App became active - preload data if enabled
+            // App became active - refresh data and schedule background tasks
             Task {
+                await portfolioStore.refreshAllPrices()
                 if dataRefreshManager.preloadingEnabled {
                     await dataRefreshManager.preloadData()
                 }

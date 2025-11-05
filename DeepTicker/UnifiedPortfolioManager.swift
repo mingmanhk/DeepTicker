@@ -188,7 +188,7 @@ final class UnifiedPortfolioManager: ObservableObject {
     
     private func fetchPriceWithCache(for symbol: String, forceRefresh: Bool = false) async -> (current: Double?, previousClose: Double?) {
         let cacheKey = "stock_price_\(symbol.uppercased())"
-        let cacheExpiry: TimeInterval = 5 * 60 // 5 minutes for stock prices
+        let cacheExpiry: TimeInterval = 300 // 5 minutes
         
         // Check cache first (unless forcing refresh)
         if !forceRefresh, let cachedData: CachedStockPrice = await cache.get(cacheKey, type: CachedStockPrice.self) {
@@ -534,4 +534,3 @@ extension Notification.Name {
     static let portfolioDidChange = Notification.Name("portfolioDidChange")
     static let stockPricesUpdated = Notification.Name("stockPricesUpdated")
 }
-
