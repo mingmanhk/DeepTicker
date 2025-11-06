@@ -214,8 +214,8 @@ final class UnifiedPortfolioManager: ObservableObject {
         } catch {
             print("Failed to fetch price for \(symbol) using enhanced service: \(error.localizedDescription)")
             
-            // Final fallback: try legacy Alpha Vantage method
-            let (current, previous) = await fetchPrice(for: symbol)
+            // Final fallback: try direct Alpha Vantage method
+            let (current, previous) = await fetchPriceFromAlphaVantage(for: symbol)
             
             // Cache successful legacy results
             if let currentPrice = current {
@@ -232,35 +232,7 @@ final class UnifiedPortfolioManager: ObservableObject {
         }
     }
     
-    // MARK: - Multi-source Price Fetching
-    private func fetchPrice(for symbol: String) async -> (Double?, Double?) {
-        let (current, previous) = await fetchPriceFromYahooFinance(for: symbol)
-        if let current = current, current > 0, previous != nil {
-            return (current, previous)
-        }
-        // Fallback to Alpha Vantage if Yahoo Finance fails
-        return await fetchPriceFromAlphaVantage(for: symbol)
-    }
-
-    private func fetchPriceFromYahooFinance(for symbol: String) async -> (current: Double?, previousClose: Double?) {
-        guard let url = URL(string: "https://query1.finance.yahoo.com/v8/finance/chart/\(symbol.uppercased())") else {
-            return (nil, nil)
-        }
-
-        guard let data = await fetchData(url: url) else { return (nil, nil) }
-
-        do {
-            let response = try JSONDecoder().decode(YahooFinanceResponse.self, from: data)
-            if let meta = response.chart.result?.first?.meta {
-                // Yahoo can return 0 for price on failure; treat as nil
-                let currentPrice = meta.regularMarketPrice
-                return (currentPrice == 0 ? nil : currentPrice, meta.chartPreviousClose)
-            }
-        } catch {
-            // Data parsing failed
-        }
-        return (nil, nil)
-    }
+    // MARK: - Alpha Vantage Fallback
 
     private func fetchPriceFromAlphaVantage(for symbol: String) async -> (current: Double?, previousClose: Double?) {
         guard let url = buildURLForAlphaVantage(for: symbol), let data = await fetchData(url: url) else {
@@ -436,20 +408,6 @@ struct StockItem: Identifiable, Codable, Hashable, Sendable {
     var dailyChange: Double? {
         guard let cur = currentPrice, let prev = previousClose, prev != 0 else { return nil }
         return (cur - prev) / prev * 100.0
-    }
-}
-
-struct YahooFinanceResponse: Decodable {
-    let chart: Chart
-    struct Chart: Decodable {
-        let result: [ChartResult]?
-    }
-    struct ChartResult: Decodable {
-        let meta: Meta
-    }
-    struct Meta: Decodable {
-        let regularMarketPrice: Double?
-        let chartPreviousClose: Double?
     }
 }
 

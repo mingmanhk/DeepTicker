@@ -4,28 +4,4 @@
    <FileRef
       location = "self:">
    </FileRef>
-   <FileRef
-      location = "group:Configuration.storekit">
-   </FileRef>
-   <FileRef
-      location = "group:IAPDebugView.swift">
-   </FileRef>
-   <FileRef
-      location = "group:ProAIPurchaseView.swift">
-   </FileRef>
-   <FileRef
-      location = "group:IAP_SETUP_GUIDE.md">
-   </FileRef>
-   <FileRef
-      location = "group:Configuration 2.storekit">
-   </FileRef>
-   <FileRef
-      location = "group:ProAIPurchaseView 2.swift">
-   </FileRef>
-   <FileRef
-      location = "group:DEEPSECK_PRO_SETUP.md">
-   </FileRef>
-   <FileRef
-      location = "group:QUICK_START.md">
-   </FileRef>
 </Workspace>

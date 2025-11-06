@@ -664,36 +664,3 @@ func withTimeout<T>(_ timeout: TimeInterval, operation: @escaping () async throw
         return result
     }
 }
-
-// MARK: - Yahoo response models
-private struct YahooQuoteResponse: Decodable {
-    let quoteResponse: YahooQuoteResponseContainer
-}
-
-private struct YahooQuoteResponseContainer: Decodable {
-    let result: [YahooQuoteData]
-}
-
-private struct YahooQuoteData: Decodable {
-    let symbol: String?
-    let shortName: String?
-    let longName: String?
-    let regularMarketPrice: Double?
-    let regularMarketPreviousClose: Double?
-    let postMarketPrice: Double?
-    let preMarketPrice: Double?
-}
-
-// MARK: - Yahoo Search Response Models
-private struct YahooSearchResponse: Decodable {
-    let quotes: [YahooSearchQuote]?
-}
-
-private struct YahooSearchQuote: Decodable {
-    let symbol: String?
-    let shortName: String?
-    let longName: String?
-    let quoteType: String?
-    let exchange: String?
-}
-

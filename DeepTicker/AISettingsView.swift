@@ -3,11 +3,23 @@ import StoreKit
 
 struct AISettingsView: View {
     @StateObject private var viewModel = AISettingsViewModel()
-    // Note: Removed showingPurchaseView as ProAIPurchaseView doesn't exist yet
-    // All purchase actions are handled inline in the form
-
+    
     var body: some View {
         Form {
+            // ALWAYS show upgrade section at the top for free users
+            if !viewModel.isPremium {
+                Section {
+                    upgradeSection
+                } header: {
+                    HStack {
+                        Image(systemName: "crown.fill")
+                            .foregroundStyle(.yellow)
+                        Text("Upgrade to Pro")
+                            .font(.headline)
+                    }
+                }
+            }
+            
             Section("AI Model") {
                 Picker("Provider", selection: $viewModel.selectedAPIProvider) {
                     ForEach(viewModel.availableAPIProviders) { provider in
@@ -62,116 +74,20 @@ struct AISettingsView: View {
 
             if !viewModel.isPremium {
                 Section {
-                    // Featured upgrade information
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Image(systemName: "crown.fill")
-                                .foregroundStyle(.yellow)
-                                .font(.title2)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Upgrade to DeepSeek Pro")
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                Text("Unlock all AI models and customization")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 8)
-                        
-                        // Price display
-                        if let product = viewModel.premiumProduct {
-                            HStack {
-                                Text("Price:")
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text(product.displayPrice)
-                                    .font(.title3)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.primary)
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    if viewModel.isLoadingProducts {
-                        HStack {
-                            ProgressView()
-                            Text("Loading products...")
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding()
-                    } else {
-                        // Purchase button
-                        Button {
-                            Task { await viewModel.purchasePremium() }
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Label("Purchase DeepSeek Pro", systemImage: "cart.fill")
-                                    .font(.headline)
-                                Spacer()
-                            }
-                            .padding()
-                            .background(Color.accentColor)
-                            .foregroundStyle(.white)
-                            .cornerRadius(10)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(viewModel.isLoadingProducts || viewModel.premiumProduct == nil)
-                        
-                        // Restore button
-                        Button {
-                            Task { await viewModel.restorePurchases() }
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Label("Restore Purchases", systemImage: "arrow.clockwise")
-                                Spacer()
-                            }
-                        }
-                        .disabled(viewModel.isLoadingProducts)
-                        
-                        // Product not available warning
-                        if viewModel.premiumProduct == nil && !viewModel.isLoadingProducts {
-                            HStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundStyle(.orange)
-                                Text("Product not available. Please check your internet connection.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.vertical, 8)
-                        }
-                    }
-                    
-                    if let error = viewModel.purchaseError {
-                        HStack(spacing: 8) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.red)
-                            Text(error)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                        .padding(.vertical, 8)
-                    }
-                } header: {
-                    Text("DeepSeek Pro")
-                } footer: {
+                    // Detailed upgrade information in footer
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("DeepSeek Pro unlocks:")
+                        Text("Free version includes:")
                             .fontWeight(.semibold)
-                        Text("• Compare multiple AI models (OpenAI, Anthropic, Google, Azure)")
-                        Text("• Use your own API keys for each model")
-                        Text("• Customize AI analysis prompts")
-                        Text("• Tailor insights to your investment strategy")
-                        Text("\nFree version includes built-in DeepSeek model with preset prompts.")
+                            .foregroundStyle(.secondary)
+                        Text("• Built-in DeepSeek AI model")
+                            .foregroundStyle(.secondary)
+                        Text("• Preset analysis prompts")
+                            .foregroundStyle(.secondary)
                     }
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("Current Plan: Free")
                 }
             }
             
@@ -211,14 +127,172 @@ struct AISettingsView: View {
         }
         .navigationTitle("AI Settings")
     }
+    
+    // MARK: - Upgrade Section
+    private var upgradeSection: some View {
+        VStack(spacing: 16) {
+            // Hero section
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top) {
+                    Image(systemName: "crown.fill")
+                        .foregroundStyle(.yellow)
+                        .font(.system(size: 40))
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("DeepSeek Pro")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.primary)
+                        Text("Unlock Premium AI Features")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                
+                // Price display
+                if let product = viewModel.premiumProduct {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("One-Time Purchase")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(product.displayPrice)
+                                .font(.title)
+                                .fontWeight(.bold)
+                                .foregroundStyle(.tint)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(Color.accentColor.opacity(0.1))
+                    .cornerRadius(8)
+                }
+            }
+            
+            Divider()
+            
+            // Features list
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Pro Features:")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                
+                FeatureRow(icon: "brain.head.profile", text: "Compare Multiple AI Models", color: .blue)
+                FeatureRow(icon: "key.fill", text: "Use Your Own API Keys", color: .green)
+                FeatureRow(icon: "text.bubble.fill", text: "Customize Analysis Prompts", color: .orange)
+                FeatureRow(icon: "chart.line.uptrend.xyaxis", text: "Advanced Portfolio Insights", color: .purple)
+            }
+            
+            Divider()
+            
+            // Purchase buttons
+            VStack(spacing: 12) {
+                if viewModel.isLoadingProducts {
+                    HStack {
+                        ProgressView()
+                        Text("Loading...")
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                } else {
+                    // Main purchase button
+                    Button {
+                        Task { await viewModel.purchasePremium() }
+                    } label: {
+                        HStack {
+                            Image(systemName: "cart.fill")
+                            Text("Purchase DeepSeek Pro")
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(viewModel.premiumProduct == nil ? Color.gray : Color.accentColor)
+                        .foregroundStyle(.white)
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(viewModel.isLoadingProducts || viewModel.premiumProduct == nil)
+                    
+                    // Restore button
+                    Button {
+                        Task { await viewModel.restorePurchases() }
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Restore Purchases")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .foregroundStyle(.tint)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(viewModel.isLoadingProducts)
+                    
+                    // Product not available warning
+                    if viewModel.premiumProduct == nil && !viewModel.isLoadingProducts {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Text("Product not available. Check your connection.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                
+                // Error display
+                if let error = viewModel.purchaseError {
+                    HStack(spacing: 8) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 8)
+    }
 }
 
-#Preview("Normal View") {
+// MARK: - Feature Row Component
+struct FeatureRow: View {
+    let icon: String
+    let text: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundStyle(color)
+                .frame(width: 28)
+            
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+            
+            Spacer()
+            
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .font(.system(size: 16))
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Previews
+
+#Preview("Free User (Default)") {
     NavigationStack { AISettingsView() }
 }
 
 #Preview("Force Free User") {
-    let vm = AISettingsViewModel()
     // Force free status for preview
     UserDefaults.standard.set(false, forKey: "PremiumUnlocked")
     return NavigationStack { 

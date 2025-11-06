@@ -31,8 +31,6 @@ struct EnhancedAIInsightsTab: View {
     @ObservedObject private var portfolioManager = UnifiedPortfolioManager.shared
     @EnvironmentObject var settingsManager: SettingsManager
     
-    @State private var providerInsights: [AIProvider: PortfolioInsights] = [:]
-    @State private var collapsedPanels: Set<AIProvider> = []
     @State private var selectedMetricInfo: MetricInfo?
     
     // AI Provider Selection States
@@ -685,83 +683,6 @@ struct EnhancedAIInsightsTab: View {
         }
     }
     
-    // MARK: - Default Data Refresh Functions
-
-    private func refreshInsights() async {
-        let hasPortfolio = !dataManager.portfolio.isEmpty || !portfolioManager.items.isEmpty
-        guard hasPortfolio else {
-            providerInsights = [:]
-            return
-        }
-        if let aiPortfolio = dataManager.portfolio as? [AIStock] {
-            let newInsights = await aiService.generateMultiProviderInsights(for: aiPortfolio)
-            providerInsights = newInsights
-        }
-    }
-    
-    private func refreshTodaySummary() async {
-        isSummaryLoading = true
-        defer { isSummaryLoading = false }
-        
-        guard !getPortfolioSymbols().isEmpty else {
-            todaySummary = nil
-            summaryLastUpdate = nil
-            return
-        }
-        
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        todaySummary = TodayAISummary(
-            confidenceProfitScore: Double.random(in: 40...95),
-            marketRisk: Double.random(in: 10...70),
-            timestamp: Date()
-        )
-        providerTodaySummaries = [:]
-        summaryLastUpdate = Date()
-    }
-    
-    private func refreshStockInsights() async {
-        isStockInsightsLoading = true
-        defer { isStockInsightsLoading = false }
-        
-        let symbols = getPortfolioSymbols()
-        guard !symbols.isEmpty else {
-            stockInsights = [:]
-            stockInsightsLastUpdate = nil
-            return
-        }
-        
-        try? await Task.sleep(nanoseconds: 1_500_000_000)
-        var newInsights: [String: AIStockInsight] = [:]
-        for symbol in symbols {
-            let profitLikelihood = Double.random(in: 20...95)
-            let gainPotential = Double.random(in: 0.5...8.0)
-            let confidenceScore = Double.random(in: 45...95)
-            let upsideChance = Double.random(in: 25...90)
-            let aiMarketSignalScore = (profitLikelihood * 0.35) + (min(gainPotential * 10, 100) * 0.25) + (confidenceScore * 0.25) + (upsideChance * 0.15)
-            newInsights[symbol] = AIStockInsight(symbol: symbol, aiMarketSignalScore: aiMarketSignalScore, profitLikelihood: profitLikelihood, gainPotential: gainPotential, confidenceScore: confidenceScore, upsideChance: upsideChance, timestamp: Date())
-        }
-        stockInsights = newInsights
-        stockInsightsLastUpdate = Date()
-    }
-    
-    private func refreshMarketingBriefing() async {
-        var stocks: [DeepSeekManager.Stock] = dataManager.portfolio.map {
-            .init(symbol: $0.symbol, currentPrice: $0.currentPrice, previousClose: $0.previousClose, quantity: Double($0.quantity))
-        }
-        let existingSymbols = Set(stocks.map { $0.symbol })
-        let unifiedStocks = portfolioManager.items.compactMap { item -> DeepSeekManager.Stock? in
-            guard !existingSymbols.contains(item.symbol) else { return nil }
-            return .init(symbol: item.symbol, currentPrice: item.currentPrice ?? 0, previousClose: item.previousClose ?? 0, quantity: Double(item.quantity))
-        }
-        stocks.append(contentsOf: unifiedStocks)
-        
-        guard !stocks.isEmpty else {
-            marketingBriefingManager.clearCurrentBriefing()
-            return
-        }
-        await marketingBriefingManager.generateBriefing(for: stocks, settingsManager: settingsManager)
-    }
-
     // MARK: - Helpers & Color Logic
     
     private var marketingBriefingEmptyMessage: String {

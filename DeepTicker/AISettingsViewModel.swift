@@ -54,7 +54,10 @@ final class AISettingsViewModel: ObservableObject {
     }
 
     init() {
-        self.isPremium = UserDefaults.standard.bool(forKey: Self.premiumKey)
+        // IMPORTANT: Default to FREE mode
+        // Only set to premium if explicitly purchased and verified by StoreKit
+        // DO NOT rely on UserDefaults - always start as free until StoreKit confirms
+        self.isPremium = false
 
         // Load API key from keychain
         self.apiKey = (try? keychain.get(account: Self.apiKeyAccount)) ?? ""
@@ -69,7 +72,7 @@ final class AISettingsViewModel: ObservableObject {
             self.selectedAPIProvider = .deepseek
         }
 
-        // Apply gating
+        // Apply gating (defaults to free mode)
         applyEntitlementGating()
 
         Task { [weak self] in
@@ -77,11 +80,16 @@ final class AISettingsViewModel: ObservableObject {
             self.isLoadingProducts = true
             await purchaseManager.configure(productID: Self.premiumProductID)
             self.isLoadingProducts = false
-            // Reflect current purchase state into our gating
-            self.isPremium = purchaseManager.isPurchased || UserDefaults.standard.bool(forKey: Self.premiumKey)
+            
+            // ONLY set premium if StoreKit confirms the purchase
+            // This ensures we don't have false positives
+            self.isPremium = purchaseManager.isPurchased
             self.applyEntitlementGating()
             
-            // Debug: Log product availability
+            // Debug logging
+            print("[AISettingsViewModel] 🎯 App Mode: \(self.isPremium ? "PREMIUM" : "FREE (Default)")")
+            print("[AISettingsViewModel] 📦 Product Loaded: \(purchaseManager.premiumProduct != nil ? "YES" : "NO")")
+            
             if purchaseManager.premiumProduct == nil {
                 print("[AISettingsViewModel] ⚠️ Premium product not loaded. Check product ID and StoreKit configuration.")
             }
@@ -115,22 +123,58 @@ final class AISettingsViewModel: ObservableObject {
     // MARK: - Purchase Flow (wire this to StoreKit elsewhere)
     @MainActor
     func purchasePremium() async {
+        trackAnalytics(.purchaseButtonTapped, parameters: [
+            "product_id": Self.premiumProductID,
+            "price": premiumProduct?.displayPrice ?? "unknown"
+        ])
+        
         purchaseError = nil
+        trackAnalytics(.purchaseStarted)
+        
         do {
             try await purchaseManager.purchasePremium()
             syncPurchaseStateFromManager()
+            
+            if isPremium {
+                trackAnalytics(.purchaseCompleted, parameters: [
+                    "product_id": Self.premiumProductID,
+                    "price": premiumProduct?.displayPrice ?? "unknown"
+                ])
+            }
         } catch {
             // Keep free state on failure
             print("[AISettingsViewModel] Purchase failed: \(error)")
             purchaseError = error.localizedDescription
+            
+            // Track failure reason
+            if error.localizedDescription.contains("cancel") {
+                trackAnalytics(.purchaseCancelled)
+            } else {
+                trackAnalytics(.purchaseFailed, parameters: [
+                    "error": error.localizedDescription,
+                    "error_code": (error as NSError).code
+                ])
+            }
         }
     }
 
     @MainActor
     func restorePurchases() async {
+        trackAnalytics(.restoreButtonTapped)
         purchaseError = nil
+        
         await purchaseManager.restore()
         syncPurchaseStateFromManager()
+        
+        if isPremium {
+            trackAnalytics(.restoreCompleted, parameters: [
+                "product_id": Self.premiumProductID
+            ])
+        } else {
+            trackAnalytics(.restoreFailed, parameters: [
+                "reason": "no_purchases_found"
+            ])
+        }
     }
     
     // MARK: - Debug Helper (Remove in production)
@@ -164,6 +208,57 @@ final class AISettingsViewModel: ObservableObject {
         } else {
             try? keychain.set(apiKey, account: Self.apiKeyAccount)
         }
+    }
+    
+    // MARK: - Analytics Tracking
+    
+    /// Analytics events for IAP tracking
+    enum AnalyticsEvent {
+        case settingsViewed
+        case upgradeSectionViewed
+        case purchaseButtonTapped
+        case purchaseStarted
+        case purchaseCompleted
+        case purchaseFailed
+        case purchaseCancelled
+        case restoreButtonTapped
+        case restoreCompleted
+        case restoreFailed
+        case premiumFeatureAttempted
+        
+        var name: String {
+            switch self {
+            case .settingsViewed: return "settings_viewed"
+            case .upgradeSectionViewed: return "upgrade_section_viewed"
+            case .purchaseButtonTapped: return "purchase_button_tapped"
+            case .purchaseStarted: return "purchase_started"
+            case .purchaseCompleted: return "purchase_completed"
+            case .purchaseFailed: return "purchase_failed"
+            case .purchaseCancelled: return "purchase_cancelled"
+            case .restoreButtonTapped: return "restore_button_tapped"
+            case .restoreCompleted: return "restore_completed"
+            case .restoreFailed: return "restore_failed"
+            case .premiumFeatureAttempted: return "premium_feature_attempted"
+            }
+        }
+    }
+    
+    /// Track analytics events with optional parameters
+    /// - Parameters:
+    ///   - event: The event to track
+    ///   - parameters: Additional context data
+    func trackAnalytics(_ event: AnalyticsEvent, parameters: [String: Any] = [:]) {
+        #if DEBUG
+        print("📊 [Analytics] \(event.name): \(parameters)")
+        #endif
+        
+        // TODO: Integrate with your analytics service
+        // Examples:
+        // - Firebase: Analytics.logEvent(event.name, parameters: parameters)
+        // - Mixpanel: Mixpanel.mainInstance().track(event: event.name, properties: parameters)
+        // - Custom backend: sendEventToServer(event: event, parameters: parameters)
+        
+        // For now, just console logging in debug mode
     }
 }
 

@@ -395,16 +395,3 @@ struct CacheStats {
     var misses = 0
 }
 
-// MARK: - DispatchQueue Extension
-
-private extension DispatchQueue {
-    func run<T>(_ work: @escaping () -> T) async -> T {
-        return await withCheckedContinuation { continuation in
-            self.async {
-                let result = work()
-                continuation.resume(returning: result)
-            }
-        }
-    }
-}
-
