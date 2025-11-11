@@ -3,18 +3,61 @@ import Security
 import Combine
 import SwiftUI
 
+// MARK: - Notification Names
+extension Notification.Name {
+    static let apiKeyDidUpdate = Notification.Name("com.deepticker.apiKeyDidUpdate")
+}
+
 /// Secure configuration manager that handles API keys from Secrets.plist and keychain storage
 /// Uses Secrets.plist as the single source of configuration with keychain for secure storage and user modifications
 class SecureConfigurationManager: ObservableObject {
     static let shared = SecureConfigurationManager()
     
     // MARK: - API Key Storage
-    @Published var deepSeekAPIKey: String = ""
-    @Published var openRouterAPIKey: String = ""
-    @Published var openAIAPIKey: String = ""
-    @Published var qwenAPIKey: String = ""
-    @Published var alphaVantageAPIKey: String = ""
-    @Published var rapidAPIKey: String = ""
+    @Published var deepSeekAPIKey: String = "" {
+        didSet {
+            guard !isUpdatingFromKeychain else { return }
+            print("🔑 [didSet] DeepSeek API key changed, saving to keychain")
+            saveAPIKeyToKeychain(deepSeekAPIKey, for: .deepSeek)
+        }
+    }
+    @Published var openRouterAPIKey: String = "" {
+        didSet {
+            guard !isUpdatingFromKeychain else { return }
+            print("🔑 [didSet] OpenRouter API key changed, saving to keychain")
+            saveAPIKeyToKeychain(openRouterAPIKey, for: .openRouter)
+        }
+    }
+    @Published var openAIAPIKey: String = "" {
+        didSet {
+            guard !isUpdatingFromKeychain else { return }
+            print("🔑 [didSet] OpenAI API key changed, saving to keychain")
+            saveAPIKeyToKeychain(openAIAPIKey, for: .openAI)
+        }
+    }
+    @Published var qwenAPIKey: String = "" {
+        didSet {
+            guard !isUpdatingFromKeychain else { return }
+            print("🔑 [didSet] Qwen API key changed, saving to keychain")
+            saveAPIKeyToKeychain(qwenAPIKey, for: .qwen)
+        }
+    }
+    @Published var alphaVantageAPIKey: String = "" {
+        didSet {
+            guard !isUpdatingFromKeychain else { return }
+            print("🔑 [didSet] Alpha Vantage API key changed, saving to keychain")
+            saveToKeychain(alphaVantageAPIKey, account: ConfigKey.alphaVantageAPI.keychainAccount)
+            syncToSettingsManagerKeychain(key: alphaVantageAPIKey, for: .alphaVantageAPI)
+        }
+    }
+    @Published var rapidAPIKey: String = "" {
+        didSet {
+            guard !isUpdatingFromKeychain else { return }
+            print("🔑 [didSet] RapidAPI key changed, saving to keychain")
+            saveToKeychain(rapidAPIKey, account: ConfigKey.rapidAPI.keychainAccount)
+            UserDefaults.standard.set(rapidAPIKey, forKey: "rapidAPIKey")
+        }
+    }
     
     // MARK: - AI Prompt Templates (Editable)
     @Published var analyzeProfitConfidencePrompt: String = ""
@@ -53,6 +96,9 @@ class SecureConfigurationManager: ObservableObject {
     
     private let keychainService = "com.deepticker.apikeys"
     private let promptDefaults = UserDefaults.standard
+    
+    // Flag to prevent infinite recursion in didSet
+    private var isUpdatingFromKeychain = false
     
     private init() {
         loadConfiguration()
@@ -106,6 +152,10 @@ class SecureConfigurationManager: ObservableObject {
     /// Update API key and save securely
     func updateAPIKey(_ key: String, for service: AIProvider) {
         let configKey: ConfigKey
+        
+        // Set flag to prevent didSet from firing
+        isUpdatingFromKeychain = true
+        
         switch service {
         case .deepSeek: 
             deepSeekAPIKey = key
@@ -121,19 +171,79 @@ class SecureConfigurationManager: ObservableObject {
             configKey = .qwenAPI
         }
         
+        isUpdatingFromKeychain = false
+        
         saveToKeychain(key, account: configKey.keychainAccount)
+        
+        // CRITICAL: Also sync with SettingsManager's keychain for compatibility
+        syncToSettingsManager(key: key, for: service)
+        
+        // Post notification so other parts of the app can react
+        NotificationCenter.default.post(name: .apiKeyDidUpdate, object: nil, userInfo: ["provider": service])
+    }
+    
+    /// Save API key to keychain (called from didSet observers)
+    private func saveAPIKeyToKeychain(_ key: String, for service: AIProvider) {
+        let configKey: ConfigKey
+        switch service {
+        case .deepSeek: configKey = .deepSeekAPI
+        case .openRouter: configKey = .openRouterAPI
+        case .openAI: configKey = .openAIAPI
+        case .qwen: configKey = .qwenAPI
+        }
+        
+        saveToKeychain(key, account: configKey.keychainAccount)
+        syncToSettingsManager(key: key, for: service)
+        
+        // Post notification
+        NotificationCenter.default.post(name: .apiKeyDidUpdate, object: nil, userInfo: ["provider": service])
+    }
+    
+    /// Synchronize API key to SettingsManager's keychain location
+    private func syncToSettingsManager(key: String, for service: AIProvider) {
+        let settingsManagerService = "com.example.DeepTicker.apiKeys"
+        let settingsManagerAccount: String
+        
+        switch service {
+        case .deepSeek:
+            settingsManagerAccount = "com.example.DeepTicker.deepSeekAPIKey"
+        case .openRouter:
+            settingsManagerAccount = "com.example.DeepTicker.openRouterAPIKey"
+        case .openAI:
+            settingsManagerAccount = "com.example.DeepTicker.openAIAPIKey"
+        case .qwen:
+            settingsManagerAccount = "com.example.DeepTicker.qwenAPIKey"
+        }
+        
+        if key.isEmpty {
+            KeychainHelper.standard.delete(service: settingsManagerService, account: settingsManagerAccount)
+        } else {
+            KeychainHelper.standard.save(key, service: settingsManagerService, account: settingsManagerAccount)
+        }
     }
     
     /// Update Alpha Vantage API key
     func updateAlphaVantageAPIKey(_ key: String) {
         alphaVantageAPIKey = key
         saveToKeychain(key, account: ConfigKey.alphaVantageAPI.keychainAccount)
+        
+        // Also sync with SettingsManager's keychain
+        let settingsManagerService = "com.example.DeepTicker.apiKeys"
+        let settingsManagerAccount = "com.example.DeepTicker.alphaVantageAPIKey"
+        if key.isEmpty {
+            KeychainHelper.standard.delete(service: settingsManagerService, account: settingsManagerAccount)
+        } else {
+            KeychainHelper.standard.save(key, service: settingsManagerService, account: settingsManagerAccount)
+        }
     }
     
     /// Update RapidAPI key
     func updateRapidAPIKey(_ key: String) {
         rapidAPIKey = key
         saveToKeychain(key, account: ConfigKey.rapidAPI.keychainAccount)
+        
+        // RapidAPI uses UserDefaults in SettingsManager, not keychain
+        UserDefaults.standard.set(key, forKey: "rapidAPIKey")
     }
     
     /// Update prompt template
@@ -165,6 +275,8 @@ class SecureConfigurationManager: ObservableObject {
     // MARK: - Private Implementation
     
     private func loadConfiguration() {
+        isUpdatingFromKeychain = true
+        
         for configKey in ConfigKey.allCases {
             let key = loadAPIKey(for: configKey)
             
@@ -177,24 +289,88 @@ class SecureConfigurationManager: ObservableObject {
             case .rapidAPI: rapidAPIKey = key
             }
         }
+        
+        isUpdatingFromKeychain = false
     }
     
     private func loadAPIKey(for configKey: ConfigKey) -> String {
-        // Priority: 1. Keychain (for user-modified keys), 2. Secrets.plist (default configuration)
+        // Priority: 1. Keychain (for user-modified keys), 2. SettingsManager keychain (for backwards compatibility), 3. Secrets.plist (default configuration)
         
-        // 1. Try keychain first (for user-modified keys)
+        // 1. Try our keychain first (for user-modified keys)
         if let keychainKey = loadFromKeychain(account: configKey.keychainAccount), !keychainKey.isEmpty {
             return keychainKey
         }
         
-        // 2. Use Secrets.plist as the single configuration file
+        // 2. Check SettingsManager's keychain location for backwards compatibility
+        if let settingsKey = loadFromSettingsManagerKeychain(for: configKey), !settingsKey.isEmpty {
+            // Migrate to our keychain
+            saveToKeychain(settingsKey, account: configKey.keychainAccount)
+            return settingsKey
+        }
+        
+        // 3. Use Secrets.plist as the single configuration file
         if let plistKey = loadFromSecretsPlist(key: configKey.rawValue), !plistKey.isEmpty {
             // Save to keychain for future use and potential user modification
             saveToKeychain(plistKey, account: configKey.keychainAccount)
+            // Also sync to SettingsManager location
+            syncToSettingsManagerKeychain(key: plistKey, for: configKey)
             return plistKey
         }
         
         return ""
+    }
+    
+    /// Load from SettingsManager's keychain location (for backwards compatibility)
+    private func loadFromSettingsManagerKeychain(for configKey: ConfigKey) -> String? {
+        let settingsManagerService = "com.example.DeepTicker.apiKeys"
+        let settingsManagerAccount: String
+        
+        switch configKey {
+        case .deepSeekAPI:
+            settingsManagerAccount = "com.example.DeepTicker.deepSeekAPIKey"
+        case .openRouterAPI:
+            settingsManagerAccount = "com.example.DeepTicker.openRouterAPIKey"
+        case .openAIAPI:
+            settingsManagerAccount = "com.example.DeepTicker.openAIAPIKey"
+        case .qwenAPI:
+            settingsManagerAccount = "com.example.DeepTicker.qwenAPIKey"
+        case .alphaVantageAPI:
+            settingsManagerAccount = "com.example.DeepTicker.alphaVantageAPIKey"
+        case .rapidAPI:
+            // RapidAPI is stored in UserDefaults, not keychain
+            return UserDefaults.standard.string(forKey: "rapidAPIKey")
+        }
+        
+        return KeychainHelper.standard.read(service: settingsManagerService, account: settingsManagerAccount)
+    }
+    
+    /// Sync to SettingsManager's keychain location
+    private func syncToSettingsManagerKeychain(key: String, for configKey: ConfigKey) {
+        let settingsManagerService = "com.example.DeepTicker.apiKeys"
+        let settingsManagerAccount: String
+        
+        switch configKey {
+        case .deepSeekAPI:
+            settingsManagerAccount = "com.example.DeepTicker.deepSeekAPIKey"
+        case .openRouterAPI:
+            settingsManagerAccount = "com.example.DeepTicker.openRouterAPIKey"
+        case .openAIAPI:
+            settingsManagerAccount = "com.example.DeepTicker.openAIAPIKey"
+        case .qwenAPI:
+            settingsManagerAccount = "com.example.DeepTicker.qwenAPIKey"
+        case .alphaVantageAPI:
+            settingsManagerAccount = "com.example.DeepTicker.alphaVantageAPIKey"
+        case .rapidAPI:
+            // RapidAPI uses UserDefaults
+            UserDefaults.standard.set(key, forKey: "rapidAPIKey")
+            return
+        }
+        
+        if key.isEmpty {
+            KeychainHelper.standard.delete(service: settingsManagerService, account: settingsManagerAccount)
+        } else {
+            KeychainHelper.standard.save(key, service: settingsManagerService, account: settingsManagerAccount)
+        }
     }
     
     private func loadPromptTemplates() {

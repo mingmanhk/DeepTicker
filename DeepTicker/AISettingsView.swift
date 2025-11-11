@@ -179,10 +179,10 @@ struct AISettingsView: View {
                     .font(.headline)
                     .foregroundStyle(.primary)
                 
-                FeatureRow(icon: "brain.head.profile", text: "Compare Multiple AI Models", color: .blue)
-                FeatureRow(icon: "key.fill", text: "Use Your Own API Keys", color: .green)
-                FeatureRow(icon: "text.bubble.fill", text: "Customize Analysis Prompts", color: .orange)
-                FeatureRow(icon: "chart.line.uptrend.xyaxis", text: "Advanced Portfolio Insights", color: .purple)
+                ProFeatureRow(icon: "brain.head.profile", text: "Compare Multiple AI Models", color: .blue)
+                ProFeatureRow(icon: "key.fill", text: "Use Your Own API Keys", color: .green)
+                ProFeatureRow(icon: "text.bubble.fill", text: "Customize Analysis Prompts", color: .orange)
+                ProFeatureRow(icon: "chart.line.uptrend.xyaxis", text: "Advanced Portfolio Insights", color: .purple)
             }
             
             Divider()
@@ -259,8 +259,8 @@ struct AISettingsView: View {
     }
 }
 
-// MARK: - Feature Row Component
-struct FeatureRow: View {
+// MARK: - Pro Feature Row Component
+struct ProFeatureRow: View {
     let icon: String
     let text: String
     let color: Color

@@ -33,6 +33,10 @@ struct EnhancedAIInsightsTab: View {
     
     @State private var selectedMetricInfo: MetricInfo?
     
+    // State to track if initial load has completed
+    @State private var hasInitiallyLoaded = false
+    @State private var isViewVisible = false
+    
     // AI Provider Selection States
     @State private var selectedProvider: AIProvider?
     @State private var providerLoadingStates: [AIProvider: Bool] = [:]
@@ -40,6 +44,7 @@ struct EnhancedAIInsightsTab: View {
     @State private var providerTodaySummaries: [AIProvider: TodayAISummary] = [:]
     @State private var providerStockInsights: [AIProvider: [String: AIStockInsight]] = [:]
     @State private var providerMarketingBriefings: [AIProvider: DeepSeekManager.MarketingBriefing] = [:]
+    @State private var providerLastRefreshTimes: [AIProvider: Date] = [:]
     
     // Today AI Summary States
     @State private var todaySummary: TodayAISummary?
@@ -60,6 +65,14 @@ struct EnhancedAIInsightsTab: View {
         configManager.availableAIProviders as [AIProvider]
     }
     
+    // Direct check for DeepSeek without relying on availableProviders array timing
+    private var deepSeekProvider: AIProvider? {
+        guard settingsManager.isDeepSeekKeyValid || configManager.isAPIKeyValid(for: .deepSeek) else {
+            return nil
+        }
+        return .deepSeek
+    }
+    
     var body: some View {
         NavigationStack {
             content
@@ -75,23 +88,37 @@ struct EnhancedAIInsightsTab: View {
                 .sheet(item: $selectedMetricInfo) { metricInfo in
                     MetricExplanationSheet(metricInfo: metricInfo)
                 }
-                .task(id: [dataManager.portfolio.count, portfolioManager.items.count, availableProviders.count].description) {
-                    await refreshAllAIData()
+                .task {
+                    // Auto-select provider on first launch
+                    await autoSelectProviderIfNeeded()
+                }
+                .task(id: selectedProvider) {
+                    // Smart auto-refresh when provider changes
+                    await handleProviderChange()
+                }
+                .task(id: [dataManager.portfolio.count, portfolioManager.items.count].description) {
+                    // Refresh when portfolio changes (only if view is visible and initialized)
+                    if hasInitiallyLoaded && isViewVisible {
+                        print("🔄 [Portfolio Changed] Triggering refresh")
+                        await refreshCurrentProvider()
+                    }
                 }
                 .refreshable {
-                    await refreshAllAIData()
+                    await refreshCurrentProvider(force: true)
                 }
                 .onAppear {
-                    Task { @MainActor in
-                        // Auto-select DeepSeek by default if available and no provider selected
-                        if selectedProvider == nil, settingsManager.isDeepSeekKeyValid,
-                           let deepSeekProvider = availableProviders.first(where: { $0.displayName.lowercased().contains("deepseek") }) {
-                            selectedProvider = deepSeekProvider
-                            await generateAIInsights(for: deepSeekProvider)
-                        } else {
-                            await refreshAllAIData(force: true)
-                        }
+                    print("👁️ [OnAppear] View appeared")
+                    isViewVisible = true
+                    
+                    // Auto-select provider if needed
+                    if selectedProvider == nil, let deepSeek = deepSeekProvider {
+                        print("🔵 [OnAppear] Auto-selecting DeepSeek: \(deepSeek.displayName)")
+                        selectedProvider = deepSeek
                     }
+                }
+                .onDisappear {
+                    print("👁️ [OnDisappear] View disappeared")
+                    isViewVisible = false
                 }
         }
     }
@@ -135,6 +162,11 @@ struct EnhancedAIInsightsTab: View {
                         icon: "clock.fill",
                         text: "Updated \(lastUpdate.formatted(.relative(presentation: .named)))"
                     )
+                } else if let provider = selectedProvider, let lastRefresh = providerLastRefreshTimes[provider] {
+                    StatusIndicator(
+                        icon: "clock.fill",
+                        text: "\(provider.displayName) updated \(lastRefresh.formatted(.relative(presentation: .named)))"
+                    )
                 }
                 
                 if !availableProviders.isEmpty {
@@ -149,12 +181,7 @@ struct EnhancedAIInsightsTab: View {
                                     isSelected: selectedProvider == provider,
                                     isLoading: providerLoadingStates[provider] ?? false
                                 ) {
-                                    withAnimation(.spring()) {
-                                        selectedProvider = (selectedProvider == provider) ? nil : provider
-                                    }
-                                    if selectedProvider == provider {
-                                        Task { await generateAIInsights(for: provider) }
-                                    }
+                                    handleProviderSelection(provider)
                                 }
                             }
                         }
@@ -533,9 +560,99 @@ struct EnhancedAIInsightsTab: View {
     
     // MARK: - Refresh & Data Logic
     
+    // MARK: - Smart Auto-Refresh Logic
+    
+    /// Auto-select default provider (DeepSeek) if none is selected
+    private func autoSelectProviderIfNeeded() async {
+        guard selectedProvider == nil else { return }
+        
+        if let deepSeek = deepSeekProvider {
+            print("🤖 [Auto-Select] Selecting default provider: \(deepSeek.displayName)")
+            selectedProvider = deepSeek
+        } else if let firstProvider = availableProviders.first {
+            print("🤖 [Auto-Select] Selecting first available provider: \(firstProvider.displayName)")
+            selectedProvider = firstProvider
+        }
+    }
+    
+    /// Handle provider changes and trigger smart refresh
+    private func handleProviderChange() async {
+        guard let provider = selectedProvider else {
+            print("⚠️ [Provider Change] No provider selected")
+            return
+        }
+        
+        print("🔄 [Provider Change] Provider changed to: \(provider.displayName)")
+        
+        // Check if we need to refresh data for this provider
+        let needsRefresh = shouldRefreshProvider(provider)
+        
+        if needsRefresh {
+            print("✅ [Provider Change] Data is stale or missing, triggering refresh")
+            await generateAIInsights(for: provider)
+            hasInitiallyLoaded = true
+        } else {
+            print("✅ [Provider Change] Using cached data (still fresh)")
+            hasInitiallyLoaded = true
+        }
+    }
+    
+    /// Manual provider selection handler
+    private func handleProviderSelection(_ provider: AIProvider) {
+        withAnimation(.spring()) {
+            // Toggle selection (deselect if already selected)
+            if selectedProvider == provider {
+                selectedProvider = nil
+            } else {
+                selectedProvider = provider
+                // The .task(id: selectedProvider) will handle the refresh automatically
+            }
+        }
+    }
+    
+    /// Refresh the currently selected provider
+    private func refreshCurrentProvider(force: Bool = false) async {
+        guard let provider = selectedProvider else {
+            print("⚠️ [Refresh] No provider selected")
+            return
+        }
+        
+        if force {
+            print("🔄 [Refresh] Force refreshing provider: \(provider.displayName)")
+            // Clear cached data for this provider
+            providerSummaries.removeValue(forKey: provider)
+            providerTodaySummaries.removeValue(forKey: provider)
+            providerStockInsights.removeValue(forKey: provider)
+            providerMarketingBriefings.removeValue(forKey: provider)
+            providerLastRefreshTimes.removeValue(forKey: provider)
+        }
+        
+        await generateAIInsights(for: provider)
+    }
+    
+    /// Check if provider data should be refreshed
+    private func shouldRefreshProvider(_ provider: AIProvider) -> Bool {
+        // Always refresh if no data exists
+        guard let lastRefresh = providerLastRefreshTimes[provider],
+              providerTodaySummaries[provider] != nil else {
+            print("📊 [Should Refresh] No data exists for \(provider.displayName)")
+            return true
+        }
+        
+        // Refresh if data is older than 5 minutes
+        let cacheExpirationInterval: TimeInterval = 5 * 60 // 5 minutes
+        let isStale = Date().timeIntervalSince(lastRefresh) > cacheExpirationInterval
+        
+        if isStale {
+            print("📊 [Should Refresh] Data is stale (last refresh: \(lastRefresh.formatted(.relative(presentation: .named))))")
+        }
+        
+        return isStale
+    }
+    
     private var masterRefreshButton: some View {
         Button {
-            Task { await refreshAllAIData() }
+            Task { await refreshCurrentProvider(force: true) }
         } label: {
             Group {
                 if isAnyRefreshing {
@@ -552,7 +669,7 @@ struct EnhancedAIInsightsTab: View {
         }
         .buttonStyle(.plain)
         .disabled(isAnyRefreshing)
-        .accessibilityLabel("Refresh All AI Data")
+        .accessibilityLabel("Refresh AI Data")
     }
     
     private var isAnyRefreshing: Bool {
@@ -560,31 +677,7 @@ struct EnhancedAIInsightsTab: View {
         return aiService.isLoading || isSummaryLoading || isStockInsightsLoading || marketingBriefingManager.isLoading || selectedProviderLoading
     }
     
-    private func refreshAllAIData(force: Bool = false) async {
-        if force {
-            // Clear cached provider-specific state
-            providerSummaries.removeAll()
-            providerTodaySummaries.removeAll()
-            providerStockInsights.removeAll()
-            providerMarketingBriefings.removeAll()
-            // Clear default caches
-            todaySummary = nil
-            stockInsights.removeAll()
-            marketingBriefingManager.clearCurrentBriefing()
-            // Reset timestamps
-            summaryLastUpdate = nil
-            stockInsightsLastUpdate = nil
-        }
-        
-        // If no provider is selected, do not generate default data; leave panels empty
-        guard selectedProvider != nil else { return }
-        
-        await withTaskGroup(of: Void.self) { group in
-            if let provider = selectedProvider {
-                group.addTask { await generateAIInsights(for: provider) }
-            }
-        }
-    }
+    // MARK: - AI Insight Generation
     
     private func generateAIInsights(for provider: AIProvider) async {
         let symbols = getPortfolioSymbols()
@@ -596,15 +689,21 @@ struct EnhancedAIInsightsTab: View {
             return
         }
         
+        print("🚀 [Generating Insights] Starting for \(provider.displayName) with \(symbols.count) stocks")
         providerLoadingStates[provider] = true
+        
         await withTaskGroup(of: Void.self) { group in
-            group.addTask { await generateAISummary(for: provider, symbols: symbols) }
-            group.addTask { await generateStockInsights(for: provider, symbols: symbols) }
-            group.addTask { await generateMarketingBriefing(for: provider, symbols: symbols) }
+            group.addTask { await self.generateAISummary(for: provider, symbols: symbols) }
+            group.addTask { await self.generateStockInsights(for: provider, symbols: symbols) }
+            group.addTask { await self.generateMarketingBriefing(for: provider, symbols: symbols) }
         }
+        
         providerLoadingStates[provider] = false
+        providerLastRefreshTimes[provider] = Date()
         summaryLastUpdate = Date()
         stockInsightsLastUpdate = Date()
+        
+        print("✅ [Generating Insights] Completed for \(provider.displayName)")
     }
     
     private func generateAISummary(for provider: AIProvider, symbols: [String]) async {
@@ -628,11 +727,7 @@ struct EnhancedAIInsightsTab: View {
             providerTodaySummaries[provider] = providerSummary
             
             let summaryText = """
-            **AI Analysis**
-            **Confidence Score:** \(Int(confidencePercent))%
-            **Risk Level:** \(analysis.riskLevel)
-            
-            Analysis considers current market conditions, diversification, and risk factors.
+            **AI Analysis considers current market conditions, diversification, and risk factors.
             """
             providerSummaries[provider] = summaryText
         } catch {
@@ -650,14 +745,79 @@ struct EnhancedAIInsightsTab: View {
                         let stock = await DeepSeekManager.Stock(symbol: symbol, currentPrice: 150, previousClose: 148, quantity: 1)
                         let prediction = try await DeepSeekManager.shared.generateStockPrediction(for: stock, historicalData: [])
                         
-                        let profitLikelihood = prediction.profitLikelihood ?? (prediction.confidence * 100)
-                        let gainPotential = prediction.gainPotential ?? abs(prediction.predictedChange)
-                        let confidenceScore = prediction.confidence * 100
-                        let upsideChance = prediction.upsideChance ?? (prediction.prediction == .up ? prediction.confidence * 100 : 50.0)
+                        print("🔍 [\(symbol)] Raw AI prediction values:")
+                        print("   - confidence: \(prediction.confidence)")
+                        print("   - profitLikelihood: \(prediction.profitLikelihood ?? -1)")
+                        print("   - gainPotential: \(prediction.gainPotential ?? -1)")
+                        print("   - upsideChance: \(prediction.upsideChance ?? -1)")
                         
-                        let aiMarketSignalScore = (profitLikelihood * 0.35) + (min(gainPotential * 10, 100) * 0.25) + (confidenceScore * 0.25) + (upsideChance * 0.15)
+                        // Helper function to normalize values to 0-100 range
+                        func normalizeToPercentage(_ value: Double) -> Double {
+                            // If value is already in percentage range (0-100), use it
+                            if value >= 0 && value <= 100 {
+                                return value
+                            }
+                            // If value is in decimal range (0-1), convert to percentage
+                            else if value >= 0 && value <= 1 {
+                                return value * 100
+                            }
+                            // If value is out of range, clamp it
+                            else {
+                                return min(max(value, 0), 100)
+                            }
+                        }
                         
-                        return (symbol, AIStockInsight(symbol: symbol, aiMarketSignalScore: aiMarketSignalScore, profitLikelihood: profitLikelihood, gainPotential: gainPotential, confidenceScore: confidenceScore, upsideChance: upsideChance, timestamp: Date()))
+                        // Confidence typically comes as 0-1 from AI models
+                        let confidenceScore = normalizeToPercentage(prediction.confidence)
+                        
+                        // Profit likelihood - normalize it
+                        let profitLikelihood: Double
+                        if let pl = prediction.profitLikelihood {
+                            profitLikelihood = normalizeToPercentage(pl)
+                        } else {
+                            profitLikelihood = confidenceScore
+                        }
+                        
+                        // Gain potential - this might be a raw percentage change
+                        let gainPotential: Double
+                        if let gp = prediction.gainPotential {
+                            gainPotential = normalizeToPercentage(gp)
+                        } else {
+                            // predictedChange is usually a small decimal like 0.025 (2.5%)
+                            let rawChange = abs(prediction.predictedChange)
+                            gainPotential = rawChange > 1 ? min(rawChange, 100) : (rawChange * 100)
+                        }
+                        
+                        // Upside chance - normalize it
+                        let upsideChance: Double
+                        if let uc = prediction.upsideChance {
+                            upsideChance = normalizeToPercentage(uc)
+                        } else {
+                            upsideChance = prediction.prediction == .up ? confidenceScore : 50.0
+                        }
+                        
+                        print("🔍 [\(symbol)] Normalized values:")
+                        print("   - confidenceScore: \(confidenceScore)")
+                        print("   - profitLikelihood: \(profitLikelihood)")
+                        print("   - gainPotential: \(gainPotential)")
+                        print("   - upsideChance: \(upsideChance)")
+                        
+                        // Calculate AI Market Signal Score (weighted average, result should be 0-100)
+                        let aiMarketSignalScore = (profitLikelihood * 0.35) + (gainPotential * 0.25) + (confidenceScore * 0.25) + (upsideChance * 0.15)
+                        
+                        print("🔍 [\(symbol)] AI Market Signal Score: \(aiMarketSignalScore)")
+                        
+                        let finalInsight = AIStockInsight(
+                            symbol: symbol,
+                            aiMarketSignalScore: aiMarketSignalScore,
+                            profitLikelihood: profitLikelihood,
+                            gainPotential: gainPotential,
+                            confidenceScore: confidenceScore,
+                            upsideChance: upsideChance,
+                            timestamp: Date()
+                        )
+                        
+                        return (symbol, finalInsight)
                     } catch {
                         print("❌ Failed to generate insight for \(symbol): \(error)")
                         return (symbol, nil)

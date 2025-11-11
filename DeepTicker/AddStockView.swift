@@ -19,9 +19,62 @@ struct AddStockView: View {
     
     @State private var debounceTask: Task<Void, Never>? = nil
     
+    // Computed properties for API key status
+    private var hasRapidAPIKey: Bool {
+        !SecureConfigurationManager.shared.rapidAPIKey.isEmpty
+    }
+    
+    private var hasAlphaVantageKey: Bool {
+        !SecureConfigurationManager.shared.alphaVantageAPIKey.isEmpty
+    }
+    
+    private var hasRequiredAPIKeys: Bool {
+        hasRapidAPIKey || hasAlphaVantageKey
+    }
+    
     var body: some View {
         NavigationView {
             Form {
+                // API Status Section
+                if !hasRequiredAPIKeys {
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                Text("API Keys Required")
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            Text("To fetch real-time stock prices, please configure your RapidAPI and Alpha Vantage keys in Settings.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text("Current Status:")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .padding(.top, 4)
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: hasRapidAPIKey ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                    .foregroundColor(hasRapidAPIKey ? .green : .red)
+                                    .font(.caption)
+                                Text("RapidAPI")
+                                    .font(.caption)
+                            }
+                            
+                            HStack(spacing: 4) {
+                                Image(systemName: hasAlphaVantageKey ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                    .foregroundColor(hasAlphaVantageKey ? .green : .red)
+                                    .font(.caption)
+                                Text("Alpha Vantage")
+                                    .font(.caption)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                
                 Section("Search Stocks") {
                     HStack {
                         Image(systemName: "magnifyingglass")
@@ -212,8 +265,12 @@ struct AddStockView: View {
                     }
                 }
             }
-            .alert("Error", isPresented: $showingAlert) {
-                Button("OK") { }
+            .alert(alertMessage.contains("API") ? "API Configuration Required" : "Error", isPresented: $showingAlert) {
+                if alertMessage.contains("API") {
+                    Button("Enter Manually", role: .cancel) { }
+                } else {
+                    Button("OK") { }
+                }
             } message: {
                 Text(alertMessage)
             }
@@ -411,27 +468,44 @@ struct AddStockView: View {
     }
     
     private func fetchAndPrefillDetails(for symbol: String) async {
+        print("🔵 ==================== FETCH PRICE START ====================")
         print("🔵 Fetching price details for: \(symbol)")
+        
+        // Debug: Check API key configuration
+        let configManager = SecureConfigurationManager.shared
+        let rapidKey = configManager.rapidAPIKey
+        let alphaKey = configManager.alphaVantageAPIKey
+        
+        print("🔵 API Key Status:")
+        print("   📍 RapidAPI: \(rapidKey.isEmpty ? "❌ EMPTY" : "✅ Configured (\(rapidKey.count) chars, ends with: ***\(rapidKey.suffix(4)))")")
+        print("   📍 Alpha Vantage: \(alphaKey.isEmpty ? "❌ EMPTY" : "✅ Configured (\(alphaKey.count) chars, ends with: ***\(alphaKey.suffix(4)))")")
         
         await MainActor.run {
             isLoadingPrice = true
         }
         
+        print("🔵 Attempting DefaultStockPriceService (RapidAPI primary -> Alpha Vantage fallback)...")
+        
         do {
-            let quote = try await defaultService.fetchStockPrice(symbol: symbol, timeout: 10.0) // Increased timeout
+            let quote = try await defaultService.fetchStockPrice(symbol: symbol, timeout: 10.0)
             await MainActor.run {
                 // Pre-fill purchase price with current price only if field is empty
                 if self.purchasePrice.isEmpty {
                     let prefill = quote.currentPrice
                     self.purchasePrice = String(format: "%.2f", prefill)
-                    print("🔵 Pre-filled purchase price: \(self.purchasePrice) for \(symbol)")
+                    print("✅ SUCCESS! Pre-filled purchase price: $\(self.purchasePrice) for \(symbol)")
+                    print("✅ Data source: \(quote.dataSource.displayName)")
+                    print("✅ Timestamp: \(quote.timestamp)")
                 } else {
                     print("🔵 Purchase price already set (\(self.purchasePrice)), not overriding")
                 }
                 self.isLoadingPrice = false
             }
+            print("🔵 ==================== FETCH PRICE SUCCESS ====================")
         } catch {
             print("🔴 DefaultService failed for \(symbol): \(error.localizedDescription)")
+            print("🔵 Trying direct Alpha Vantage as last resort...")
+            
             // As a fallback, try Alpha Vantage with longer timeout
             do {
                 let stock = try await alphaVantageService.fetchStockPrice(symbol: symbol)
@@ -440,54 +514,63 @@ struct AddStockView: View {
                     if self.purchasePrice.isEmpty {
                         let prefill = stock.currentPrice
                         self.purchasePrice = String(format: "%.2f", prefill)
-                        print("🔵 Pre-filled purchase price from AV: \(self.purchasePrice) for \(symbol)")
+                        print("✅ SUCCESS! Pre-filled purchase price from direct Alpha Vantage: $\(self.purchasePrice) for \(symbol)")
                     } else {
                         print("🔵 Purchase price already set (\(self.purchasePrice)), not overriding")
                     }
                     self.isLoadingPrice = false
                 }
+                print("🔵 ==================== FETCH PRICE SUCCESS (Alpha Vantage) ====================")
             } catch {
-                print("🔴 Alpha Vantage also failed for \(symbol): \(error.localizedDescription)")
+                print("🔴 Direct Alpha Vantage also failed for \(symbol): \(error.localizedDescription)")
+                print("🔴 ==================== FETCH PRICE FAILED ====================")
                 
-                // Final fallback: try to get any price data for common stocks
-                await tryFinalPriceFallback(symbol: symbol)
+                // Show error instead of using estimated prices
+                await showAPIKeyRequiredAlert(for: symbol, error: error)
             }
         }
     }
     
-    private func tryFinalPriceFallback(symbol: String) async {
+    private func showAPIKeyRequiredAlert(for symbol: String, error: Error) async {
         await MainActor.run {
-            if self.purchasePrice.isEmpty {
-                // For very common stocks, we could provide estimated ranges
-                switch symbol.uppercased() {
-                case "AAPL", "APPLE":
-                    self.purchasePrice = "150.00"  // Approximate AAPL price
-                case "GOOGL", "GOOG", "GOOGLE":
-                    self.purchasePrice = "130.00"  // Approximate Google price
-                case "MSFT", "MICROSOFT":
-                    self.purchasePrice = "350.00"  // Approximate Microsoft price
-                case "TSLA", "TESLA":
-                    self.purchasePrice = "200.00"  // Approximate Tesla price
-                case "AMZN", "AMAZON":
-                    self.purchasePrice = "140.00"  // Approximate Amazon price
-                case "META", "FB", "FACEBOOK":
-                    self.purchasePrice = "400.00"  // Approximate Meta price
-                case "NVDA", "NVIDIA":
-                    self.purchasePrice = "100.00"  // Approximate Nvidia price
-                default:
-                    // Keep empty for manual entry
-                    print("🔴 No fallback price available for \(symbol) - user must enter manually")
-                }
-                
-                if !self.purchasePrice.isEmpty {
-                    print("🟡 Using fallback price estimate: $\(self.purchasePrice) for \(symbol)")
-                    print("🟡 WARNING: This is an estimate - user should verify the actual price")
-                }
-            } else {
-                print("🔵 Keeping existing purchase price: \(self.purchasePrice)")
-            }
             self.isLoadingPrice = false
+            self.purchasePrice = "" // Clear any price
+            
+            // Check which API keys are missing
+            let configManager = SecureConfigurationManager.shared
+            let hasRapidAPI = !configManager.rapidAPIKey.isEmpty
+            let hasAlphaVantage = !configManager.alphaVantageAPIKey.isEmpty
+            
+            var message = "Unable to fetch real-time price for \(symbol).\n\n"
+            
+            if !hasRapidAPI && !hasAlphaVantage {
+                message += "⚠️ No API keys configured.\n\n"
+                message += "Please add your RapidAPI and Alpha Vantage API keys in Settings to get real-time stock prices.\n\n"
+            } else if !hasRapidAPI {
+                message += "⚠️ RapidAPI key is missing.\n\n"
+                message += "RapidAPI is the primary data source. Please add your RapidAPI key in Settings.\n\n"
+            } else if !hasAlphaVantage {
+                message += "⚠️ Alpha Vantage key is missing.\n\n"
+                message += "RapidAPI failed. Please add Alpha Vantage as a fallback in Settings.\n\n"
+            } else {
+                message += "⚠️ Both API services are unavailable.\n\n"
+                message += "This could be due to:\n"
+                message += "• Invalid API keys\n"
+                message += "• Rate limits exceeded\n"
+                message += "• Network connectivity issues\n\n"
+                message += "Please check your API keys in Settings.\n\n"
+            }
+            
+            message += "You can still add the stock by entering the purchase price manually."
+            
+            self.alertMessage = message
+            self.showingAlert = true
         }
+    }
+    
+    private func tryFinalPriceFallback(symbol: String) async {
+        // This function is now deprecated - we show alerts instead
+        await showAPIKeyRequiredAlert(for: symbol, error: NSError(domain: "StockPrice", code: -1, userInfo: [NSLocalizedDescriptionKey: "No price data available"]))
     }
     
     private func addStock() {

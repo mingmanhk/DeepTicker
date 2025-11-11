@@ -3,18 +3,13 @@ import UIKit
 
 struct ComprehensiveSettingsView: View {
     @ObservedObject private var configManager = SecureConfigurationManager.shared
-    @ObservedObject private var dataManager = DataManager.shared
     @State private var expandedSections: Set<SettingsSection> = [.apiKeys]
     @State private var selectedPrompt: PromptType?
-
-    @State private var showingClearCacheAlert = false
     
     enum SettingsSection: String, CaseIterable, Identifiable {
         case apiKeys = "Data & API Settings"
         case aiPrompts = "AI Prompt Templates"  
-        case appPreferences = "App Preferences"
         case supportFeedback = "Support & Feedback"
-        case developerTools = "Developer Tools"
         
         var id: String { rawValue }
         
@@ -22,9 +17,7 @@ struct ComprehensiveSettingsView: View {
             switch self {
             case .apiKeys: return "key"
             case .aiPrompts: return "brain.head.profile"
-            case .appPreferences: return "gearshape"
             case .supportFeedback: return "envelope"
-            case .developerTools: return "hammer"
             }
         }
         
@@ -32,9 +25,7 @@ struct ComprehensiveSettingsView: View {
             switch self {
             case .apiKeys: return .blue
             case .aiPrompts: return .purple
-            case .appPreferences: return .green
             case .supportFeedback: return .orange
-            case .developerTools: return .red
             }
         }
     }
@@ -51,15 +42,6 @@ struct ComprehensiveSettingsView: View {
             .sheet(item: $selectedPrompt) { promptType in
                 PromptEditorSheet(promptType: promptType)
                     .environmentObject(configManager)
-            }
-
-            .alert("Clear Cache", isPresented: $showingClearCacheAlert) {
-                Button("Clear", role: .destructive) {
-                    dataManager.clearCache()
-                }
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                Text("This will clear all cached data and force fresh downloads on next refresh.")
             }
         }
     }
@@ -120,18 +102,13 @@ struct ComprehensiveSettingsView: View {
         switch section {
         case .apiKeys:
             let validAICount = AIProvider.allCases.filter { configManager.isAPIKeyValid(for: $0) }.count
-            let totalProviders = AIProvider.allCases.count + 2 // +1 for Alpha Vantage, +1 for RapidAPI
+            let totalProviders = AIProvider.allCases.count + 1 // +1 for Alpha Vantage only
             let validAV = configManager.isAlphaVantageKeyValid ? 1 : 0
-            let validRapid = configManager.isRapidAPIKeyValid ? 1 : 0
-            return "\(validAICount + validAV + validRapid)/\(totalProviders) providers configured"
+            return "\(validAICount + validAV)/\(totalProviders) providers configured"
         case .aiPrompts:
             return "Customize AI analysis prompts"
-        case .appPreferences:
-            return "Theme, notifications, refresh intervals"
         case .supportFeedback:
             return "Get help and share your feedback"
-        case .developerTools:
-            return "Cache management and app maintenance"
         }
     }
     
@@ -142,12 +119,8 @@ struct ComprehensiveSettingsView: View {
             apiKeysSection
         case .aiPrompts:
             aiPromptsSection
-        case .appPreferences:
-            appPreferencesSection
         case .supportFeedback:
             supportFeedbackSection
-        case .developerTools:
-            developerToolsSection
         }
     }
     
@@ -174,16 +147,6 @@ struct ComprehensiveSettingsView: View {
             apiKey: $configManager.alphaVantageAPIKey,
             isValid: configManager.isAlphaVantageKeyValid,
             getKeyURL: URL(string: "https://www.alphavantage.co/support/#api-key")!
-        )
-        
-        // RapidAPI Key
-        apiKeyInputRow(
-            title: "RapidAPI",
-            icon: "bolt.horizontal",
-            iconColor: .indigo,
-            apiKey: $configManager.rapidAPIKey,
-            isValid: configManager.isRapidAPIKeyValid,
-            getKeyURL: URL(string: "https://rapidapi.com/hub")!
         )
     }
     
@@ -290,50 +253,6 @@ struct ComprehensiveSettingsView: View {
         .foregroundStyle(.red)
     }
     
-    // MARK: - App Preferences Section
-    
-    @ViewBuilder
-    private var appPreferencesSection: some View {
-        // Refresh Frequency
-        HStack {
-            Text("Auto-refresh Frequency")
-            Spacer()
-            Picker("Frequency", selection: .constant("30min")) {
-                Text("15 minutes").tag("15min")
-                Text("30 minutes").tag("30min")
-                Text("1 hour").tag("1h")
-                Text("Manual only").tag("manual")
-            }
-            .pickerStyle(.menu)
-        }
-        
-        // Theme
-        HStack {
-            Text("Appearance")
-            Spacer()
-            Picker("Theme", selection: .constant("auto")) {
-                Text("Light").tag("light")
-                Text("Dark").tag("dark")
-                Text("Auto").tag("auto")
-            }
-            .pickerStyle(.menu)
-        }
-        
-        // Notifications
-        Toggle("Enable Notifications", isOn: .constant(true))
-        
-        // Data Source Priority
-        HStack {
-            Text("Primary Data Source")
-            Spacer()
-            Picker("Source", selection: .constant("yahoo")) {
-                Text("Yahoo Finance").tag("yahoo")
-                Text("Alpha Vantage").tag("alpha")
-            }
-            .pickerStyle(.menu)
-        }
-    }
-    
     // MARK: - Support & Feedback Section
     
     @ViewBuilder
@@ -408,88 +327,6 @@ struct ComprehensiveSettingsView: View {
                 .padding(.leading, 28) // Align with text above
         }
         .padding(.vertical, 4)
-    }
-    
-    // MARK: - Developer Tools Section
-    
-    @ViewBuilder
-    private var developerToolsSection: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text("Cache Status")
-                    .font(.subheadline)
-                if let lastUpdate = dataManager.lastUpdateTime {
-                    Text("Last updated: \(lastUpdate, style: .relative)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("No cached data")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            
-            Spacer()
-            
-            Button("Clear Cache") {
-                showingClearCacheAlert = true
-            }
-            .foregroundStyle(.red)
-        }
-        
-        // API Testing
-        Button("Test API Connections") {
-            Task {
-                await testAPIConnections()
-            }
-        }
-        .foregroundStyle(.blue)
-        
-        // Export Settings
-        Button("Export Settings") {
-            exportSettings()
-        }
-        .foregroundStyle(.blue)
-        
-        // TODO: Implement IAPDebugView
-//        #if DEBUG
-//        // IAP Debug Tool
-//        NavigationLink {
-//            IAPDebugView()
-//        } label: {
-//            HStack {
-//                Image(systemName: "cart.badge.questionmark")
-//                    .foregroundStyle(.purple)
-//                    .frame(width: 20)
-//                
-//                VStack(alignment: .leading, spacing: 2) {
-//                    Text("IAP Debug Tool")
-//                        .font(.subheadline)
-//                        .fontWeight(.medium)
-//                        .foregroundStyle(.primary)
-//                    
-//                    Text("Troubleshoot In-App Purchases")
-//                        .font(.caption)
-//                        .foregroundStyle(.secondary)
-//                }
-//                
-//                Spacer()
-//                
-//                Image(systemName: "chevron.right")
-//                    .font(.caption2)
-//                    .foregroundStyle(.secondary)
-//            }
-//            .padding(.vertical, 4)
-//        }
-//        #endif
-        
-        // App Info
-        HStack {
-            Text("App Version")
-            Spacer()
-            Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")
-                .foregroundStyle(.secondary)
-        }
     }
     
     // MARK: - Actions

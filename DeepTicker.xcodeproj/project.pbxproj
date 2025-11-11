@@ -9,8 +9,11 @@
 /* Begin PBXBuildFile section */
 		993298022EB5C8EC007D56DE /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 993297842EB5C8EC007D56DE /* README.md */; };
 		995221E42EBC3C8E00AA18BE /* privacy-policy.html in Resources */ = {isa = PBXBuildFile; fileRef = 9952215C2EBC3C8E00AA18BE /* privacy-policy.html */; };
+		995221F82EBC55CE00AA18BE /* APP_STORE_METADATA.md in Resources */ = {isa = PBXBuildFile; fileRef = 995221F72EBC55CE00AA18BE /* APP_STORE_METADATA.md */; };
 		99A427C82EBC2B6500A0D45C /* TESTING_CHECKLIST.md in Resources */ = {isa = PBXBuildFile; fileRef = 99A427C72EBC2B6500A0D45C /* TESTING_CHECKLIST.md */; };
 		99A427CA2EBC2D1D00A0D45C /* check_duplicates.sh in Resources */ = {isa = PBXBuildFile; fileRef = 99A427C92EBC2D1D00A0D45C /* check_duplicates.sh */; };
+		99AE4B532EC3A7BB00536A47 /* COMMIT_MESSAGE.md in Resources */ = {isa = PBXBuildFile; fileRef = 99AE4B522EC3A7BB00536A47 /* COMMIT_MESSAGE.md */; };
+		99AE4B552EC3A7D800536A47 /* PRE_PUSH_CHECKLIST.md in Resources */ = {isa = PBXBuildFile; fileRef = 99AE4B542EC3A7D800536A47 /* PRE_PUSH_CHECKLIST.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,8 +36,11 @@
 /* Begin PBXFileReference section */
 		993297842EB5C8EC007D56DE /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		9952215C2EBC3C8E00AA18BE /* privacy-policy.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "privacy-policy.html"; sourceTree = "<group>"; };
+		995221F72EBC55CE00AA18BE /* APP_STORE_METADATA.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = APP_STORE_METADATA.md; sourceTree = "<group>"; };
 		99A427C72EBC2B6500A0D45C /* TESTING_CHECKLIST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = TESTING_CHECKLIST.md; sourceTree = "<group>"; };
 		99A427C92EBC2D1D00A0D45C /* check_duplicates.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = check_duplicates.sh; sourceTree = "<group>"; };
+		99AE4B522EC3A7BB00536A47 /* COMMIT_MESSAGE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = COMMIT_MESSAGE.md; sourceTree = "<group>"; };
+		99AE4B542EC3A7D800536A47 /* PRE_PUSH_CHECKLIST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = PRE_PUSH_CHECKLIST.md; sourceTree = "<group>"; };
 		99CC1B252EAC3BE4002417F4 /* DeepTicker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeepTicker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		99CC1B342EAC3BEC002417F4 /* DeepTickerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DeepTickerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		99CC1B3E2EAC3BEC002417F4 /* DeepTickerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DeepTickerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -100,6 +106,9 @@
 				9952215C2EBC3C8E00AA18BE /* privacy-policy.html */,
 				99A427C72EBC2B6500A0D45C /* TESTING_CHECKLIST.md */,
 				99A427C92EBC2D1D00A0D45C /* check_duplicates.sh */,
+				995221F72EBC55CE00AA18BE /* APP_STORE_METADATA.md */,
+				99AE4B522EC3A7BB00536A47 /* COMMIT_MESSAGE.md */,
+				99AE4B542EC3A7D800536A47 /* PRE_PUSH_CHECKLIST.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -236,6 +245,9 @@
 			files = (
 				99A427CA2EBC2D1D00A0D45C /* check_duplicates.sh in Resources */,
 				99A427C82EBC2B6500A0D45C /* TESTING_CHECKLIST.md in Resources */,
+				995221F82EBC55CE00AA18BE /* APP_STORE_METADATA.md in Resources */,
+				99AE4B532EC3A7BB00536A47 /* COMMIT_MESSAGE.md in Resources */,
+				99AE4B552EC3A7D800536A47 /* PRE_PUSH_CHECKLIST.md in Resources */,
 				995221E42EBC3C8E00AA18BE /* privacy-policy.html in Resources */,
 				993298022EB5C8EC007D56DE /* README.md in Resources */,
 			);
