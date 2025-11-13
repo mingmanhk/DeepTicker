@@ -109,4 +109,13 @@ Default selection: If a valid DeepSeek key is present, DeepSeek is auto-selected
 - **No Tracking**: Zero collection of personal data
 - **Full Control**: Complete ownership of your financial information
 
-*Last Updated: November 3, 2025*
+## 📬 Contact & Feedback
+
+For support, bug reports, and feature requests, feel free to reach out to the developer:
+
+- **Primary Contact:** victor.lam@pinkkamii.com
+- You can also open issues or discussions on GitHub for bugs, suggestions, or to collaborate.
+- Your feedback is greatly appreciated and helps shape future releases of DeepTicker.
+- For prompt or data-related feature requests or privacy concerns, please contact directly.
+
+*Last Updated: November 13, 2025*
