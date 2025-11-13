@@ -19,6 +19,9 @@ final class AISettingsViewModel: ObservableObject {
         var id: String { rawValue }
     }
 
+    // Shared instance
+    static let shared = AISettingsViewModel()
+
     // Premium gating
     @Published var isPremium: Bool {
         didSet { UserDefaults.standard.set(isPremium, forKey: Self.premiumKey) }
@@ -60,7 +63,8 @@ final class AISettingsViewModel: ObservableObject {
         self.isPremium = false
 
         // Load API key from keychain
-        self.apiKey = (try? keychain.get(account: Self.apiKeyAccount)) ?? ""
+        let service = Bundle.main.bundleIdentifier ?? "DeepTicker"
+        self.apiKey = KeychainHelper.standard.read(service: service, account: Self.apiKeyAccount) ?? ""
 
         // Load custom prompt
         self.customPrompt = UserDefaults.standard.string(forKey: Self.promptKey) ?? ""
@@ -103,6 +107,7 @@ final class AISettingsViewModel: ObservableObject {
             availableAPIProviders = APIProvider.allCases
             isPromptEditingEnabled = true
         } else {
+            // Free version: Only DeepSeek for AI analysis
             availableAPIProviders = [.deepseek]
             isPromptEditingEnabled = false
             // Force provider to DeepSeek if not premium
@@ -187,8 +192,6 @@ final class AISettingsViewModel: ObservableObject {
     }
     #endif
 
-    private let keychain = KeychainStore()
-
     @Published var isLoadingProducts = false
     @Published var purchaseError: String?
     
@@ -202,11 +205,14 @@ final class AISettingsViewModel: ObservableObject {
         if !isPremium && selectedAPIProvider != .deepseek {
             return
         }
+        
+        let service = Bundle.main.bundleIdentifier ?? "DeepTicker"
+        
         if apiKey.isEmpty {
             // Remove from Keychain when cleared
-            try? keychain.delete(account: Self.apiKeyAccount)
+            KeychainHelper.standard.delete(service: service, account: Self.apiKeyAccount)
         } else {
-            try? keychain.set(apiKey, account: Self.apiKeyAccount)
+            KeychainHelper.standard.save(apiKey, service: service, account: Self.apiKeyAccount)
         }
     }
     

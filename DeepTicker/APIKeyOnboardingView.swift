@@ -18,7 +18,7 @@ struct APIKeyOnboardingView: View {
     @State private var validationMessage = ""
     @State private var validationSuccess = false
     
-    private let totalPages = 4 // Welcome, DeepSeek, Alpha Vantage, Complete
+    private let totalPages = 5 // Welcome, Pro Intro, DeepSeek, Alpha Vantage, Complete
     
     var body: some View {
         NavigationStack {
@@ -39,9 +39,11 @@ struct APIKeyOnboardingView: View {
                     // Content
                     TabView(selection: $currentPage) {
                         welcomePage.tag(0)
-                        deepSeekPage.tag(1)
-                        alphaVantagePage.tag(2)
-                        completePage.tag(3)
+                        OnboardingProIntroView()
+                            .tag(1)
+                        deepSeekPage.tag(2)
+                        alphaVantagePage.tag(3)
+                        completePage.tag(4)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                     .animation(.easeInOut, value: currentPage)
@@ -111,23 +113,23 @@ struct APIKeyOnboardingView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     FeatureRow(
                         icon: "brain.head.profile",
+                        iconColor: .purple,
                         title: "DeepSeek AI",
-                        description: "For intelligent portfolio analysis",
-                        color: .purple
+                        description: "For intelligent portfolio analysis"
                     )
                     
                     FeatureRow(
                         icon: "chart.line.uptrend.xyaxis",
+                        iconColor: .blue,
                         title: "Alpha Vantage",
-                        description: "For real-time stock price data",
-                        color: .blue
+                        description: "For real-time stock price data"
                     )
                     
                     FeatureRow(
                         icon: "chart.bar.fill",
+                        iconColor: .orange,
                         title: "RapidAPI",
-                        description: "For enhanced stock data (Yahoo Finance)",
-                        color: .orange
+                        description: "For enhanced stock data (Yahoo Finance)"
                     )
                 }
                 .padding()
@@ -339,23 +341,23 @@ struct APIKeyOnboardingView: View {
                         VStack(spacing: 12) {
                             FeatureRow(
                                 icon: "checkmark.circle.fill",
+                                iconColor: .green,
                                 title: "DeepSeek AI",
-                                description: "Connected and ready",
-                                color: .green
+                                description: "Connected and ready"
                             )
                             
                             FeatureRow(
                                 icon: "checkmark.circle.fill",
+                                iconColor: .green,
                                 title: "Alpha Vantage",
-                                description: "Connected and ready",
-                                color: .green
+                                description: "Connected and ready"
                             )
                             
                             FeatureRow(
                                 icon: "checkmark.circle.fill",
+                                iconColor: .green,
                                 title: "RapidAPI",
-                                description: "Connected and ready",
-                                color: .green
+                                description: "Connected and ready"
                             )
                         }
                         .padding()
@@ -390,18 +392,18 @@ struct APIKeyOnboardingView: View {
                         if !deepSeekKey.isEmpty {
                             FeatureRow(
                                 icon: "brain.head.profile",
+                                iconColor: .purple,
                                 title: "DeepSeek AI",
-                                description: "Key provided",
-                                color: .purple
+                                description: "Key provided"
                             )
                         }
                         
                         if !alphaVantageKey.isEmpty {
                             FeatureRow(
                                 icon: "chart.line.uptrend.xyaxis",
+                                iconColor: .blue,
                                 title: "Alpha Vantage",
-                                description: "Key provided",
-                                color: .blue
+                                description: "Key provided"
                             )
                         }
                     }
@@ -559,34 +561,6 @@ struct APIKeyOnboardingView: View {
 }
 
 // MARK: - Supporting Views
-
-struct FeatureRow: View {
-    let icon: String
-    let title: String
-    let description: String
-    let color: Color
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 24))
-                .foregroundStyle(color)
-                .frame(width: 40, height: 40)
-                .background(color.opacity(0.1))
-                .cornerRadius(8)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.headline)
-                Text(description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            
-            Spacer()
-        }
-    }
-}
 
 struct InfoBox: View {
     let icon: String

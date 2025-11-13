@@ -3,6 +3,8 @@ import StoreKit
 
 struct AISettingsView: View {
     @StateObject private var viewModel = AISettingsViewModel()
+    @State private var showUpgradeSheet = false
+    @State private var selectedUpgradeFeature: SmartUpgradePrompt.ProFeature?
     
     var body: some View {
         Form {
@@ -21,18 +23,48 @@ struct AISettingsView: View {
             }
             
             Section("AI Model") {
-                Picker("Provider", selection: $viewModel.selectedAPIProvider) {
-                    ForEach(viewModel.availableAPIProviders) { provider in
-                        Text(provider.rawValue).tag(provider)
+                // Show all providers but make premium ones tappable with upgrade prompt
+                if viewModel.isPremium {
+                    Picker("Provider", selection: $viewModel.selectedAPIProvider) {
+                        ForEach(AISettingsViewModel.APIProvider.allCases) { provider in
+                            Text(provider.rawValue).tag(provider)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                } else {
+                    // Free users: Show all providers but gate premium ones
+                    ForEach(AISettingsViewModel.APIProvider.allCases) { provider in
+                        Button {
+                            if provider == .deepseek {
+                                viewModel.selectedAPIProvider = provider
+                            } else {
+                                // Show smart upgrade prompt
+                                selectedUpgradeFeature = .advancedAI
+                            }
+                        } label: {
+                            HStack {
+                                Text(provider.rawValue)
+                                    .foregroundStyle(provider == .deepseek ? .primary : .secondary)
+                                
+                                Spacer()
+                                
+                                if provider == viewModel.selectedAPIProvider {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(.blue)
+                                } else if provider != .deepseek {
+                                    ProFeaturesBadge()
+                                }
+                            }
+                        }
                     }
                 }
-                .pickerStyle(.menu)
+                
                 if !viewModel.isPremium {
                     HStack(spacing: 8) {
-                        Image(systemName: "lock.fill")
-                            .foregroundStyle(.orange)
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.yellow)
                             .font(.caption)
-                        Text("Upgrade to DeepSeek Pro to compare multiple AI models")
+                        Text("Tap any premium provider to learn more")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -57,18 +89,38 @@ struct AISettingsView: View {
             }
 
             Section("Custom Prompt") {
-                TextEditor(text: $viewModel.customPrompt)
-                    .frame(minHeight: 140)
-                    .disabled(!viewModel.isPromptEditingEnabled)
-                if !viewModel.isPromptEditingEnabled {
-                    HStack(spacing: 8) {
-                        Image(systemName: "lock.fill")
-                            .foregroundStyle(.orange)
-                            .font(.caption)
-                        Text("DeepSeek Pro required to customize AI prompts")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                if viewModel.isPremium {
+                    TextEditor(text: $viewModel.customPrompt)
+                        .frame(minHeight: 140)
+                } else {
+                    // Show preview but make it tappable to show upgrade prompt
+                    Button {
+                        selectedUpgradeFeature = .customPrompts
+                    } label: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(viewModel.customPrompt.isEmpty ? "Tap to customize AI prompts..." : viewModel.customPrompt)
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(6)
+                                .frame(minHeight: 140, alignment: .topLeading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            HStack(spacing: 8) {
+                                Image(systemName: "lock.fill")
+                                    .foregroundStyle(.orange)
+                                    .font(.caption)
+                                Text("Tap to unlock custom prompts with Pro")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                
+                                Spacer()
+                                
+                                ProFeaturesBadge()
+                            }
+                        }
+                        .padding(.vertical, 4)
                     }
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -126,6 +178,33 @@ struct AISettingsView: View {
             #endif
         }
         .navigationTitle("AI Settings")
+        .sheet(item: $selectedUpgradeFeature) { feature in
+            ZStack {
+                Color.black.opacity(0.4)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        selectedUpgradeFeature = nil
+                    }
+                
+                SmartUpgradePrompt(
+                    feature: feature,
+                    onUpgrade: {
+                        selectedUpgradeFeature = nil
+                        showUpgradeSheet = true
+                        IAPAnalytics.shared.trackUpgradeScreenViewed(source: "ai_settings_\(feature.title)")
+                    },
+                    onDismiss: {
+                        selectedUpgradeFeature = nil
+                    }
+                )
+            }
+            .presentationBackground(.clear)
+        }
+        .sheet(isPresented: $showUpgradeSheet) {
+            NavigationStack {
+                UpgradeToProView()
+            }
+        }
     }
     
     // MARK: - Upgrade Section

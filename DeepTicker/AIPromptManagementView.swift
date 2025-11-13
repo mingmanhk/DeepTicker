@@ -2,12 +2,44 @@ import SwiftUI
 
 struct AIPromptManagementView: View {
     @EnvironmentObject var settingsManager: SettingsManager
+    @StateObject private var aiSettings = AISettingsViewModel.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showingResetAlert = false
+    @State private var selectedUpgradeFeature: SmartUpgradePrompt.ProFeature?
+    @State private var showUpgradeSheet = false
     
     var body: some View {
         NavigationStack {
             List {
+                // Pro upgrade banner for free users
+                if !aiSettings.isPremium {
+                    Section {
+                        HStack(spacing: 12) {
+                            Image(systemName: "lock.fill")
+                                .font(.title2)
+                                .foregroundStyle(.orange)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Custom Prompts Locked")
+                                    .font(.headline)
+                                
+                                Text("Upgrade to Pro to customize AI prompts")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            ProFeaturesBadge()
+                        }
+                        .padding(.vertical, 8)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedUpgradeFeature = .customPrompts
+                        }
+                    }
+                }
+                
                 Section {
                     Text("Customize the AI prompts used throughout the app for stock analysis, predictions, and portfolio management. These templates are shared across all AI-powered features.")
                         .font(.subheadline)
@@ -18,7 +50,11 @@ struct AIPromptManagementView: View {
                     PromptRow(
                         title: "System Prompt",
                         description: "Base instructions for the AI analyst",
-                        prompt: $settingsManager.analyzeSystemPrompt
+                        prompt: $settingsManager.analyzeSystemPrompt,
+                        isLocked: !aiSettings.isPremium,
+                        onLockedTap: {
+                            selectedUpgradeFeature = .customPrompts
+                        }
                     )
                 }
                 
@@ -26,25 +62,41 @@ struct AIPromptManagementView: View {
                     PromptRow(
                         title: "Risk Analysis",
                         description: "Portfolio risk and diversification analysis",
-                        prompt: $settingsManager.analyzePredictionRiskPrompt
+                        prompt: $settingsManager.analyzePredictionRiskPrompt,
+                        isLocked: !aiSettings.isPremium,
+                        onLockedTap: {
+                            selectedUpgradeFeature = .customPrompts
+                        }
                     )
                     
                     PromptRow(
                         title: "Confidence Analysis",
                         description: "Prediction confidence assessment",
-                        prompt: $settingsManager.analyzePredictionConfidencePrompt
+                        prompt: $settingsManager.analyzePredictionConfidencePrompt,
+                        isLocked: !aiSettings.isPremium,
+                        onLockedTap: {
+                            selectedUpgradeFeature = .customPrompts
+                        }
                     )
                     
                     PromptRow(
                         title: "Price Prediction",
                         description: "Stock movement predictions with JSON format",
-                        prompt: $settingsManager.analyzePredictionPrompt
+                        prompt: $settingsManager.analyzePredictionPrompt,
+                        isLocked: !aiSettings.isPremium,
+                        onLockedTap: {
+                            selectedUpgradeFeature = .customPrompts
+                        }
                     )
                     
                     PromptRow(
                         title: "Investment Analysis",
                         description: "Daily market briefing and portfolio health",
-                        prompt: $settingsManager.analyzeMyInvestmentPrompt
+                        prompt: $settingsManager.analyzeMyInvestmentPrompt,
+                        isLocked: !aiSettings.isPremium,
+                        onLockedTap: {
+                            selectedUpgradeFeature = .customPrompts
+                        }
                     )
                 }
                 
@@ -74,6 +126,33 @@ struct AIPromptManagementView: View {
             } message: {
                 Text("This will reset all AI prompts to their default values. This action cannot be undone.")
             }
+            .sheet(item: $selectedUpgradeFeature) { feature in
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            selectedUpgradeFeature = nil
+                        }
+                    
+                    SmartUpgradePrompt(
+                        feature: feature,
+                        onUpgrade: {
+                            selectedUpgradeFeature = nil
+                            showUpgradeSheet = true
+                            IAPAnalytics.shared.trackUpgradeScreenViewed(source: "prompt_management")
+                        },
+                        onDismiss: {
+                            selectedUpgradeFeature = nil
+                        }
+                    )
+                }
+                .presentationBackground(.clear)
+            }
+            .sheet(isPresented: $showUpgradeSheet) {
+                NavigationStack {
+                    UpgradeToProView()
+                }
+            }
         }
     }
     
@@ -94,19 +173,33 @@ struct PromptRow: View {
     let title: String
     let description: String
     @Binding var prompt: String
+    var isLocked: Bool = false
+    var onLockedTap: (() -> Void)?
     @State private var showingEditor = false
     
     var body: some View {
         Button {
-            showingEditor = true
+            if isLocked {
+                onLockedTap?()
+            } else {
+                showingEditor = true
+            }
         } label: {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(title)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.primary)
+                        HStack(spacing: 8) {
+                            Text(title)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.primary)
+                            
+                            if isLocked {
+                                Image(systemName: "lock.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
                         
                         Text(description)
                             .font(.caption)
@@ -115,9 +208,13 @@ struct PromptRow: View {
                     
                     Spacer()
                     
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                    if isLocked {
+                        ProFeaturesBadge()
+                    } else {
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
                 
                 Text(String(prompt.prefix(100)) + (prompt.count > 100 ? "..." : ""))

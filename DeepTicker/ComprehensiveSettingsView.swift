@@ -1,12 +1,15 @@
 import SwiftUI
+import SwiftUI
 import UIKit
 
 struct ComprehensiveSettingsView: View {
     @ObservedObject private var configManager = SecureConfigurationManager.shared
+    @StateObject private var aiSettings = AISettingsViewModel.shared
     @State private var expandedSections: Set<SettingsSection> = [.apiKeys]
     @State private var selectedPrompt: PromptType?
     
     enum SettingsSection: String, CaseIterable, Identifiable {
+        case upgrade = "Upgrade to Pro"
         case apiKeys = "Data & API Settings"
         case aiPrompts = "AI Prompt Templates"  
         case supportFeedback = "Support & Feedback"
@@ -15,6 +18,7 @@ struct ComprehensiveSettingsView: View {
         
         var icon: String {
             switch self {
+            case .upgrade: return "star.circle.fill"
             case .apiKeys: return "key"
             case .aiPrompts: return "brain.head.profile"
             case .supportFeedback: return "envelope"
@@ -23,6 +27,7 @@ struct ComprehensiveSettingsView: View {
         
         var color: Color {
             switch self {
+            case .upgrade: return .yellow
             case .apiKeys: return .blue
             case .aiPrompts: return .purple
             case .supportFeedback: return .orange
@@ -100,13 +105,22 @@ struct ComprehensiveSettingsView: View {
     
     private func sectionSubtitle(for section: SettingsSection) -> String {
         switch section {
+        case .upgrade:
+            return aiSettings.isPremium ? "Premium Active" : "Unlock advanced features"
         case .apiKeys:
-            let validAICount = AIProvider.allCases.filter { configManager.isAPIKeyValid(for: $0) }.count
-            let totalProviders = AIProvider.allCases.count + 1 // +1 for Alpha Vantage only
-            let validAV = configManager.isAlphaVantageKeyValid ? 1 : 0
-            return "\(validAICount + validAV)/\(totalProviders) providers configured"
+            if aiSettings.isPremium {
+                let validAICount = AIProvider.allCases.filter { configManager.isAPIKeyValid(for: $0) }.count
+                let totalProviders = AIProvider.allCases.count + 1 // +1 for Alpha Vantage
+                let validAV = configManager.isAlphaVantageKeyValid ? 1 : 0
+                return "\(validAICount + validAV)/\(totalProviders) providers configured"
+            } else {
+                // Free: Only DeepSeek + Alpha Vantage
+                let validDeepSeek = configManager.isAPIKeyValid(for: .deepSeek) ? 1 : 0
+                let validAV = configManager.isAlphaVantageKeyValid ? 1 : 0
+                return "\(validDeepSeek + validAV)/2 free providers configured"
+            }
         case .aiPrompts:
-            return "Customize AI analysis prompts"
+            return aiSettings.isPremium ? "Customize AI analysis prompts" : "Pro required for custom prompts"
         case .supportFeedback:
             return "Get help and share your feedback"
         }
@@ -115,6 +129,8 @@ struct ComprehensiveSettingsView: View {
     @ViewBuilder
     private func sectionContent(for section: SettingsSection) -> some View {
         switch section {
+        case .upgrade:
+            upgradeSection
         case .apiKeys:
             apiKeysSection
         case .aiPrompts:
@@ -124,30 +140,132 @@ struct ComprehensiveSettingsView: View {
         }
     }
     
+    // MARK: - Upgrade Section
+    
+    @ViewBuilder
+    private var upgradeSection: some View {
+        NavigationLink(destination: UpgradeToProView()) {
+            HStack(spacing: 12) {
+                Image(systemName: aiSettings.isPremium ? "checkmark.circle.fill" : "star.circle.fill")
+                    .foregroundStyle(aiSettings.isPremium ? .green : .yellow)
+                    .font(.title2)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    if aiSettings.isPremium {
+                        Text("Premium Active")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        Text("You have full access to all Pro features")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Unlock Pro Features")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        Text("Get advanced AI providers, custom prompts, and more")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(.plain)
+    }
+    
     // MARK: - API Keys Section
     
     @ViewBuilder
     private var apiKeysSection: some View {
-        ForEach(AIProvider.allCases) { provider in
-            apiKeyInputRow(
-                title: provider.displayName,
-                icon: provider.iconName,
-                iconColor: provider.primaryColor,
-                apiKey: binding(for: provider),
-                isValid: configManager.isAPIKeyValid(for: provider),
-                getKeyURL: provider.apiKeyURL
-            )
-        }
+        // Free users: Only Alpha Vantage and DeepSeek
+        // Pro users: All AI providers + Alpha Vantage
         
-        // Alpha Vantage API Key
+        // Alpha Vantage API Key (always available - free + pro)
         apiKeyInputRow(
             title: "Alpha Vantage",
             icon: "chart.line.uptrend.xyaxis",
             iconColor: .cyan,
             apiKey: $configManager.alphaVantageAPIKey,
             isValid: configManager.isAlphaVantageKeyValid,
-            getKeyURL: URL(string: "https://www.alphavantage.co/support/#api-key")!
+            getKeyURL: URL(string: "https://www.alphavantage.co/support/#api-key")!,
+            isLocked: false
         )
+        
+        ForEach(AIProvider.allCases) { provider in
+            // DeepSeek is always available (free + pro)
+            if provider == .deepSeek {
+                apiKeyInputRow(
+                    title: provider.displayName,
+                    icon: provider.iconName,
+                    iconColor: provider.primaryColor,
+                    apiKey: binding(for: provider),
+                    isValid: configManager.isAPIKeyValid(for: provider),
+                    getKeyURL: provider.apiKeyURL,
+                    isLocked: false
+                )
+            } else if aiSettings.isPremium {
+                // Pro users can access all other providers
+                apiKeyInputRow(
+                    title: provider.displayName,
+                    icon: provider.iconName,
+                    iconColor: provider.primaryColor,
+                    apiKey: binding(for: provider),
+                    isValid: configManager.isAPIKeyValid(for: provider),
+                    getKeyURL: provider.apiKeyURL,
+                    isLocked: false
+                )
+            } else {
+                // Free users see locked providers
+                lockedAPIKeyRow(
+                    title: provider.displayName,
+                    icon: provider.iconName,
+                    iconColor: provider.primaryColor
+                )
+            }
+        }
+        
+        // Show upgrade hint for free users
+        if !aiSettings.isPremium {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "lock.fill")
+                        .foregroundStyle(.orange)
+                        .font(.caption)
+                    Text("Additional AI providers require Pro")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Button {
+                    // Collapse this section and expand upgrade section
+                    withAnimation {
+                        expandedSections.remove(.apiKeys)
+                        expandedSections.insert(.upgrade)
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "crown.fill")
+                            .foregroundStyle(.yellow)
+                        Text("Upgrade to Pro")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Color.accentColor.opacity(0.1))
+                    .foregroundStyle(Color.accentColor)
+                    .cornerRadius(8)
+                }
+            }
+            .padding(.top, 8)
+        }
     }
     
     @ViewBuilder
@@ -157,7 +275,8 @@ struct ComprehensiveSettingsView: View {
         iconColor: Color,
         apiKey: Binding<String>,
         isValid: Bool,
-        getKeyURL: URL?
+        getKeyURL: URL?,
+        isLocked: Bool
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -171,7 +290,11 @@ struct ComprehensiveSettingsView: View {
                 
                 Spacer()
                 
-                if isValid {
+                if isLocked {
+                    Image(systemName: "lock.fill")
+                        .foregroundStyle(.orange)
+                        .font(.caption)
+                } else if isValid {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 } else {
@@ -185,6 +308,7 @@ struct ComprehensiveSettingsView: View {
                     .textFieldStyle(.roundedBorder)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
+                    .disabled(isLocked)
                 
                 if let url = getKeyURL {
                     Link(destination: url) {
@@ -193,11 +317,63 @@ struct ComprehensiveSettingsView: View {
                             .fontWeight(.medium)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(Color.accentColor.opacity(0.1))
-                            .foregroundStyle(Color.accentColor)
+                            .background(isLocked ? Color.gray.opacity(0.1) : Color.accentColor.opacity(0.1))
+                            .foregroundStyle(isLocked ? .gray : Color.accentColor)
                             .cornerRadius(6)
                     }
+                    .disabled(isLocked)
                 }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func lockedAPIKeyRow(
+        title: String,
+        icon: String,
+        iconColor: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundStyle(iconColor.opacity(0.5))
+                    .frame(width: 20)
+                
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+                
+                Spacer()
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "lock.fill")
+                        .font(.caption)
+                    Text("Pro")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    LinearGradient(
+                        colors: [.orange, .pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(6)
+            }
+            
+            HStack {
+                Text("Requires Pro subscription")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(6)
             }
         }
     }
@@ -219,38 +395,120 @@ struct ComprehensiveSettingsView: View {
     
     @ViewBuilder
     private var aiPromptsSection: some View {
-        ForEach([PromptType.profitConfidence, .risk, .prediction, .portfolio], id: \.key) { promptType in
-            Button {
-                selectedPrompt = promptType
-            } label: {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
+        if aiSettings.isPremium {
+            // Pro users: Full access to edit prompts
+            ForEach([PromptType.profitConfidence, .risk, .prediction, .portfolio], id: \.key) { promptType in
+                Button {
+                    selectedPrompt = promptType
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(promptType.displayName)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.primary)
+                            
+                            Text(configManager.getPromptTemplate(for: promptType))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+                .buttonStyle(.plain)
+            }
+            
+            Button("Reset All to Defaults") {
+                resetAllPrompts()
+            }
+            .foregroundStyle(.red)
+        } else {
+            // Free users: Show locked prompt templates
+            ForEach([PromptType.profitConfidence, .risk, .prediction, .portfolio], id: \.key) { promptType in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "doc.text.fill")
+                            .foregroundStyle(.purple.opacity(0.5))
+                            .frame(width: 20)
+                        
                         Text(promptType.displayName)
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .foregroundStyle(.primary)
-                        
-                        Text(configManager.getPromptTemplate(for: promptType))
-                            .font(.caption)
                             .foregroundStyle(.secondary)
-                            .lineLimit(2)
+                        
+                        Spacer()
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "lock.fill")
+                                .font(.caption)
+                            Text("Pro")
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(6)
                     }
                     
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
+                    Text("Custom prompt editing requires Pro")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(6)
                 }
                 .padding(.vertical, 4)
             }
-            .buttonStyle(.plain)
+            
+            // Upgrade prompt for free users
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(.yellow)
+                        .font(.caption)
+                    Text("Unlock AI Prompt Templates with Pro")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Button {
+                    // Collapse this section and expand upgrade section
+                    withAnimation {
+                        expandedSections.remove(.aiPrompts)
+                        expandedSections.insert(.upgrade)
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "crown.fill")
+                            .foregroundStyle(.yellow)
+                        Text("Upgrade to Pro")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Color.accentColor.opacity(0.1))
+                    .foregroundStyle(Color.accentColor)
+                    .cornerRadius(8)
+                }
+            }
+            .padding(.top, 8)
         }
-        
-        Button("Reset All to Defaults") {
-            resetAllPrompts()
-        }
-        .foregroundStyle(.red)
     }
     
     // MARK: - Support & Feedback Section

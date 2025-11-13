@@ -566,10 +566,16 @@ struct EnhancedAIInsightsTab: View {
     private func autoSelectProviderIfNeeded() async {
         guard selectedProvider == nil else { return }
         
-        if let deepSeek = deepSeekProvider {
+        // Try to select DeepSeek first (default)
+        if let deepSeek = availableProviders.first(where: { $0 == .deepSeek }) {
+            print("🤖 [Auto-Select] Selecting default provider: \(deepSeek.displayName)")
+            selectedProvider = deepSeek
+        } else if let deepSeek = deepSeekProvider {
+            // Fallback to deepSeekProvider check if not in availableProviders yet
             print("🤖 [Auto-Select] Selecting default provider: \(deepSeek.displayName)")
             selectedProvider = deepSeek
         } else if let firstProvider = availableProviders.first {
+            // Final fallback to first available provider
             print("🤖 [Auto-Select] Selecting first available provider: \(firstProvider.displayName)")
             selectedProvider = firstProvider
         }
@@ -600,10 +606,9 @@ struct EnhancedAIInsightsTab: View {
     /// Manual provider selection handler
     private func handleProviderSelection(_ provider: AIProvider) {
         withAnimation(.spring()) {
-            // Toggle selection (deselect if already selected)
-            if selectedProvider == provider {
-                selectedProvider = nil
-            } else {
+            // Only allow selection, not deselection
+            // A provider must always be selected
+            if selectedProvider != provider {
                 selectedProvider = provider
                 // The .task(id: selectedProvider) will handle the refresh automatically
             }
